@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "auto_slicer"
+version = "0.1.0"
+description = "Auto-Slicer automates the slicing of STEP or STL files and uploads Gcode to Octoprint."
+authors = ["brucejiverson <brucejamesiverson@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pysimplegui = "^5.0.4"
+requests = "^2.31.0"
+octorest = { path = "./octorest_fork" }
+
+[tool.poetry.scripts]
+auto-slicer = "poetry run auto-slicer.main:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
