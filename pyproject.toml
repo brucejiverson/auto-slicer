@@ -10,10 +10,10 @@ readme = "README.md"
 python = "^3.12"
 pysimplegui = "^5.0.4"
 requests = "^2.31.0"
-octorest = { path = "./octorest_fork" }
+octorest = "^0.4"
 
 [tool.poetry.scripts]
-auto-slicer = "poetry run auto-slicer.main:main"
+auto-slicer = "auto_slicer.ui:main"
 
 [build-system]
 requires = ["poetry-core"]

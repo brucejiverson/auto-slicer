@@ -1,8 +1,17 @@
 import PySimpleGUI as sg
 import os
 from typing import List, Tuple
+from dataclasses import dataclass
 
 import auto_slicer.octopi_integration as octopi_integration
+from auto_slicer import slice_stl
+
+
+@dataclass
+class BoMLineItem:
+    part_name: str
+    quantity: int
+    file_path: str
 
 
 DEFAULT_TEXT_SETTINGS = {
@@ -58,26 +67,26 @@ def create_file_folder_ui() -> str:
     return None
 
 
-def create_parts_ui(parts_list: List[Tuple[str, int]]) -> List[Tuple[str, int]]:
+def create_parts_ui(parts_list: List[BoMLineItem]) -> List[BoMLineItem]:
     """
     Create a GUI to display parts with checkboxes and editable quantities, allowing selection for processing.
 
     Args:
-        parts_list (List[Tuple[str, int]]): A list of tuples representing parts and their quantities.
+        parts_list (List[BoMLineItem]): A list of tuples representing parts and their quantities.
 
     Returns:
-        List[Tuple[str, int]]: A list of tuples representing the selected parts and their quantities.
+        List[BoMLineItem]: A list of tuples representing the selected parts and their quantities.
     """
     layout = [
         [
             sg.Checkbox('', default=True, key=f'CHECK_{index}', size=(20, 1)),
-            sg.Text(f'Part: {part[0]}', **DEFAULT_TEXT_SETTINGS),
+            sg.Text(f'Part: {bom_item.part_name}', **DEFAULT_TEXT_SETTINGS),
             sg.InputText(
-                default_text=str(part[1]),
+                default_text=str(bom_item.quantity),
                 key=f'QUANTITY_{index}', justification='right',
                 **DEFAULT_TEXT_SETTINGS)
         ]
-        for index, part in enumerate(parts_list)
+        for index, bom_item in enumerate(parts_list)
     ]
     layout.append([sg.Button('Select All'), sg.Button('Clear All'), sg.Button('SLICE'), sg.Button('Cancel')])
 
@@ -95,12 +104,11 @@ def create_parts_ui(parts_list: List[Tuple[str, int]]) -> List[Tuple[str, int]]:
             for index in range(len(parts_list)):
                 window[f'CHECK_{index}'].update(value=False)
         if event == 'SLICE':
-            new_parts_list = []
-            for index, part in enumerate(parts_list):
+            for index, part_info in enumerate(parts_list):
                 if values[f'CHECK_{index}']:
-                    new_parts_list.append((part[0], int(values[f'QUANTITY_{index}'])))
+                    part_info.quantity = int(values[f'QUANTITY_{index}'])
             window.close()
-            return new_parts_list
+            return parts_list
 
 
 def clean_file_dict(file_dict) -> dict:
@@ -142,12 +150,10 @@ def create_dict_of_files(folder_path: str, valid_extensions: list[str]) -> dict:
 
         elif os.path.isdir(item_path):
             files[item] = create_dict_of_files(item_path, valid_extensions)
-        else:
-            raise ValueError(f'Invalid file or folder: {item_path}')
     return clean_file_dict(files)
 
 
-def parts_data_from_file_dict(file_dict: dict) -> List[Tuple[str, int, str]]:
+def parts_data_from_file_dict(file_dict: dict) -> List[BoMLineItem]:
     """
     Extract parts data from a dictionary of files.
 
@@ -156,15 +162,21 @@ def parts_data_from_file_dict(file_dict: dict) -> List[Tuple[str, int, str]]:
         and the values are the full file paths.
 
     Returns:
-        List[Tuple[str, int, str]]: A list of tuples representing parts, quantities, and file paths.
+        List[BoMLineItem]: A list of tuples representing parts, quantities, and file paths.
     """
 
     parts_data = []
-    for key, value in file_dict.items():
+    # here value will either be another dict representing a subfolder or a list of file paths
+    for folder_name, value in file_dict.items():
         if isinstance(value, dict):
             parts_data.extend(parts_data_from_file_dict(value))
+        elif isinstance(value, list):
+            for file_path in value:
+                parts_data.append(
+                    BoMLineItem(os.path.basename(file_path), 1, file_path)
+                )
         else:
-            parts_data.append([key, 1, value])
+            raise ValueError("Invalid file_dict format! \n{}".format(file_dict))
     return parts_data
 
 
@@ -178,16 +190,20 @@ def main():
             file_dict = create_dict_of_files(input_path, ['.step', '.stp', '.stl'])
             parts_data = parts_data_from_file_dict(file_dict)
 
+        print("File dict:", file_dict)
+        print("Parts data:", parts_data)
         mutated_parts_data = create_parts_ui(parts_data)
-        
+        print("Mutated parts data:", mutated_parts_data)
         # Slice each part
-        for part_name, quantity, path_to_part in mutated_parts_data:
-            print(f'Slicing {quantity} of {part_name}...')
+        for bom_item in mutated_parts_data:
+            print(f'Slicing {bom_item.part_name}.')
             # Logic for slicing the part
-            gcode_path = path_to_part.replace('.stl', '') + '.gcode'
+            slice_stl.slice_stl(bom_item.file_path)
 
         # Upload each part to a cloud service
         gcode_file_dict = create_dict_of_files(input_path, ['.gcode'])
+        response = octopi_integration.upload_nested_dict_to_octopi(gcode_file_dict)
+        print("Upload response:", response)
 
 
 if __name__ == "__main__":

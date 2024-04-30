@@ -127,16 +127,14 @@ version = "0.4"
 description = "Client library for OctoPrint REST API"
 optional = false
 python-versions = "*"
-files = []
-develop = false
+files = [
+    {file = "octorest-0.4-py3-none-any.whl", hash = "sha256:7e70512cb0aaf3f576c4736e97e372e1497c0a97bfec64c0466826c6c27588d6"},
+    {file = "octorest-0.4.tar.gz", hash = "sha256:6ce49bddfcd36ba0073556ef940f786edc69394e8779bc960d31969c60661a3b"},
+]
 
 [package.dependencies]
 requests = "*"
 websocket-client = "*"
-
-[package.source]
-type = "directory"
-url = "octorest_fork"
 
 [[package]]
 name = "pyasn1"
@@ -234,4 +232,4 @@ test = ["websockets"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "c167865dda806c8c005b92d1d76dd3befa4d55ae013a3c443fb52ea59dbf3bf4"
+content-hash = "c81afec1fef3280e883a2ae5f6c0edf9de22c428787336c3f21154397f34d2fa"

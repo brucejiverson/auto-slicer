@@ -1,17 +1,11 @@
 import requests
-import json
 from octorest import OctoRest
+
+from auto_slicer.util import get_config_parameter
 
 
 def get_api_key() -> str:
-    """Reads from config.json and returns the api key
-
-    Returns:
-        str: The api key
-    """
-    with open('config.json', 'r') as f:
-        data = json.load(f)
-        return data['octoprint_api_key']
+    return get_config_parameter("octoprint_api_key")
 
 
 #  OCTOPI REFERENCE! https://docs.octoprint.org/en/master/api/files.html
@@ -29,9 +23,11 @@ def upload_nested_dict_to_octopi(gcode_dict: dict, parent_folders: str = ""):
     client = OctoRest(url="http://octopi.local", apikey=get_api_key())
 
     for folder_name, value in gcode_dict.items():
+        folder_path_from_parent = parent_folders + folder_name
         # create the folder
-        print(f'creating folder {parent_folders + folder_name}')
-        response = client.new_folder(parent_folders + folder_name)
+        if parent_folders != "" and folder_name != "delete":
+            print(f'creating folder {folder_path_from_parent}')
+            response = client.new_folder(folder_path_from_parent)
 
         if isinstance(value, dict):
             # create a folder
@@ -48,8 +44,8 @@ def upload_nested_dict_to_octopi(gcode_dict: dict, parent_folders: str = ""):
             # foldername and default to the root folder of the location.
 
             for file_path in value:
-                print(f'uploading {file_path} to {parent_folders}')
-                client.upload(file_path, path=parent_folders, location="local")
+                print(f'uploading {file_path} to {folder_path_from_parent}')
+                client.upload(file_path, path=folder_path_from_parent, location="local")
         else:
             raise ValueError("Invalid gcode_dict format! \n{}".format(gcode_dict))
 

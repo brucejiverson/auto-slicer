@@ -36,6 +36,8 @@ To install the dependencies, run:
 poetry install
 ```
 
+prusa-slicer-console.exe must be in your path (Windows)
+
 ## Usage
 To start the auto-slicing process, run:
 ```bash
@@ -65,43 +67,17 @@ python --version
 pip install poetry
 ```
 
-Navigate to your project. If new project, `poetry new <proj>`
 
-
-
-#### [OLD] Install git and python 3.11.3
+#### [OLD] Install git and python
 ```powershell
-winget install -e --id Python.Python.3.11
+winget install -e --id Python.Python.3.12
 winget install --id Git.Git -e --source winget
-```
-
-### 2) setup SSH keys
-Add your SSH keys to folder: `C:\Users\<username>\.ssh`
-
-Then create the ssh config file `C:\Users\<username>\.ssh\config` and put:
-```bash
-Host gitlab.atomicmachines.com
-    Preferredauthentications publickey
-    IdentityFile ~/.ssh/id_rsa
-    Port 22
-```
-Finally, verify SSH access to our gitlab server:
-```bash
-ssh git@gitlab.atomicmachines.com
-```
-
-You will see something like:
-```bash
-PS C:\Users\twoods> ssh git@gitlab.atomicmachines.com
-PTY allocation request failed on channel 0
-Welcome to GitLab, @<username>!
-Connection to gitlab.atomicmachines.com closed.
 ```
 
 ### 3) setup the development environment
 ```powershell
 # navigate to the reference design source location
-cd <path/to/capacitive-parallelism-sensor>
+cd <path/to/auto-slicer>
 
 # update pip
 python.exe -m pip install --upgrade pip
