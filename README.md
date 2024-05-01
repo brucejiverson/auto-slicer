@@ -30,6 +30,7 @@ Auto-Slicer is a CLI tool designed to automate the slicing of STL files based on
    4. Create a new continous print 
 
 
+
 ## Usage
 To start the auto-slicing process, run:
 ```bash
@@ -82,11 +83,10 @@ poetry lock
 poetry install
 ```
 
-## Setting up backtests
-See the examples folder for scripts demonstrating setting up and running backtests. `examples/simple_backtest.py` includes definitions of an algorithm, importing data from Alpaca, setting up common technical analysis indicators, running the backtest, and analyzing the performance of your algorithm.
-
-
 ### Windows
+prusa-slicer-console.exe must be in your path (Windows)
+
+
 ```
 Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/pyenv-win/pyenv-win/master/pyenv-win/install-pyenv-win.ps1" -OutFile "./install-pyenv-win.ps1"; &"./install-pyenv-win.ps1"
 ```
@@ -107,42 +107,25 @@ python --version
 pip install poetry
 ```
 
-Navigate to your project. If new project, `poetry new <proj>`
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+#### [OLD] Install git and python
+=======
 
+>>>>>>> 926fecf
 #### [OLD] Install git and python 3.11.3
+>>>>>>> 7c46fa8 (added linux instructions to readme)
 ```powershell
-winget install -e --id Python.Python.3.11
+winget install -e --id Python.Python.3.12
 winget install --id Git.Git -e --source winget
-```
-
-### 2) setup SSH keys
-Add your SSH keys to folder: `C:\Users\<username>\.ssh`
-
-Then create the ssh config file `C:\Users\<username>\.ssh\config` and put:
-```bash
-Host gitlab.atomicmachines.com
-    Preferredauthentications publickey
-    IdentityFile ~/.ssh/id_rsa
-    Port 22
-```
-Finally, verify SSH access to our gitlab server:
-```bash
-ssh git@gitlab.atomicmachines.com
-```
-
-You will see something like:
-```bash
-PS C:\Users\twoods> ssh git@gitlab.atomicmachines.com
-PTY allocation request failed on channel 0
-Welcome to GitLab, @<username>!
-Connection to gitlab.atomicmachines.com closed.
 ```
 
 ### 3) setup the development environment
 ```powershell
 # navigate to the reference design source location
-cd <path/to/capacitive-parallelism-sensor>
+cd <path/to/auto-slicer>
 
 # update pip
 python.exe -m pip install --upgrade pip

@@ -5,10 +5,6 @@ from auto_slicer.ui import clean_file_dict
 
 path_to_gcode = './auto_slicer/examples/xyz-10mm-calibration-cube_0_6mmNoz_11m_0.20mm_205C_PLA_ENDER3BLTOUCH.gcode'
 
-# do all the things
-folder_name = 'test_folder'
-path = 'folder/'  # Optional path within the local storage
-
 # Example usage:
 location = 'local'  # Or 'sdcard'
 f_dict = {'test': [path_to_gcode], 'delete': []}

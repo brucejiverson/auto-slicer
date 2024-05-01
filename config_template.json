@@ -1,0 +1,4 @@
+{
+    "octoprint_api_key": "you-shall-not-pass",
+    "slicer_config_path": "slicer_profiles/PrusaSlicer_config_bundle.ini"
+}
