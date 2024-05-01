@@ -30,23 +30,67 @@ Auto-Slicer is a CLI tool designed to automate the slicing of STL files based on
    4. Create a new continous print 
 
 
-## Installation
-To install the dependencies, run:
-```bash
-poetry install
-```
-
-prusa-slicer-console.exe must be in your path (Windows)
 
 ## Usage
 To start the auto-slicing process, run:
 ```bash
 poetry run auto-slicer
 ```
+<!-- To propogate changes to dependent modules: appears incrementing version number and then poetry update is the only way -->
 
-## Detail set up
 
-For windows:
+## Installation and set up
+### Linux
+#### Install initial tools and pyenv
+```
+sudo apt update && sudo apt upgrade
+sudo apt install curl
+
+# These are required for pyenv
+sudo apt-get install -y build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev openssl git
+
+curl https://pyenv.run | bash
+```
+
+#### Configure pyenv
+The following is required for pyenv to work.
+
+Add the following to the top of the .bashrc file:
+
+```
+export PYENV_ROOT="$HOME/.pyenv"
+export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init --path)"
+```
+Add the following to the top of the .bashrc file:
+```
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+```
+Now, restart the terminal, and run `pyenv` as initial test that pyenv was install
+
+
+#### Configure the environment and set up poetry
+Ensure at this time that you have your pyproject.toml file in the root of your project and configured correctly with the poetry standards. If you're just trying to run the tests or examples, you can use the pyproject.toml file in this repo. Otherwise, you should have cloned this project, and you can define the path to this package in your pyproject.toml file.
+
+Run the following commands to set up the environment and install poetry:
+```
+pyenv install 3.x.x
+pyenv virtualenv 3.x.x <env_name>
+pyenv local <env_name>
+pip install poetry
+poetry lock
+poetry install
+```
+
+## Setting up backtests
+See the examples folder for scripts demonstrating setting up and running backtests. `examples/simple_backtest.py` includes definitions of an algorithm, importing data from Alpaca, setting up common technical analysis indicators, running the backtest, and analyzing the performance of your algorithm.
+
+
+### Windows
+prusa-slicer-console.exe must be in your path (Windows)
+
+
 ```
 Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/pyenv-win/pyenv-win/master/pyenv-win/install-pyenv-win.ps1" -OutFile "./install-pyenv-win.ps1"; &"./install-pyenv-win.ps1"
 ```
@@ -68,7 +112,12 @@ pip install poetry
 ```
 
 
+<<<<<<< HEAD
 #### [OLD] Install git and python
+=======
+
+#### [OLD] Install git and python 3.11.3
+>>>>>>> 7c46fa8 (added linux instructions to readme)
 ```powershell
 winget install -e --id Python.Python.3.12
 winget install --id Git.Git -e --source winget
