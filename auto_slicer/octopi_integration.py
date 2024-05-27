@@ -10,6 +10,13 @@ def get_api_key() -> str:
 
 #  OCTOPI REFERENCE! https://docs.octoprint.org/en/master/api/files.html
 
+def pre_heat(tool_target: int = 150, bed_target: int = 45):
+
+    print(f'Preheating to {tool_target}C and {bed_target}C')
+    client = OctoRest(url="http://octopi.local", apikey=get_api_key())
+    client.tool_target(tool_target)
+    client.bed_target(bed_target)
+
 
 def upload_nested_dict_to_octopi(gcode_dict: dict, parent_folders: str = ""):
     """
@@ -81,5 +88,6 @@ def get_continuous_print_state():
     ).json()
 
 
+# for testing
 if __name__ == "__main__":
     print(get_continuous_print_state())

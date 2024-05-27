@@ -1,64 +1,71 @@
 import subprocess
 import os
+import logging
 
 from auto_slicer.util import get_config_parameter
 
 
+logger = logging.getLogger(__name__)
+print(__name__)
 
-def slice_stl(file_path: str, output_folder_path: str = None, slicer_config_path: str = None) -> str:
-    """Run PrusaSlicer with specific configuration settings to slice an STL file.
+
+def slice_stl_brute_force_rotation_no_support(stl_path: str, output_folder_path: str | None = None) -> str:
+    """Slices an STL file and attempts rotations on two axes in 90-degree increments if needed due to warnings.
 
     Args:
-        file_path (str): The path to the STL file.
-        output_folder_path (str, optional): The path to the output folder for the sliced G-code.
-        slicer_config_path (str, optional): The path to the slicer configuration file.
+        stl_path (str): Path to the STL file.
+        output_folder_path (str | None): Folder to save the sliced G-code files (optional, defaults to same folder as STL file).
 
     Returns:
-        str: The path to the sliced G-code file.
+        str: Path to the successfully sliced G-code file, or None if failed after all rotations.
     """
-    # Determine the slicer configuration file
-    if slicer_config_path is None:
-        slicer_config_path = get_config_parameter("slicer_config_path")
-    # Set the output folder to the folder of the file_path if not specified
-    if output_folder_path is None:
-        output_folder_path = os.path.dirname(file_path)
-    output_folder_path = os.path.abspath(output_folder_path)
-    output_path = os.path.join(output_folder_path, os.path.splitext(os.path.basename(file_path))[0] + ".gcode")
-    print(f'Output path: {output_path}')
+    max_rotation = 360
+    slicer_config_path = get_config_parameter("slicer_config_path")
 
-    # Assemble the command
+    if output_folder_path is None:
+        output_folder_path = os.path.dirname(stl_path)
+    output_folder_path = os.path.abspath(output_folder_path)
+
+    # Try rotations on Y-axis
+    for rotation in range(0, max_rotation, 90):
+        if slice_stl_no_support(stl_path, slicer_config_path, output_folder_path, rotation, 'y'):
+            return slice_stl_no_support(stl_path, slicer_config_path, output_folder_path, rotation, 'y')
+
+    # Try rotations on X-axis
+    for rotation in range(0, max_rotation, 90):
+        if slice_stl_no_support(stl_path, slicer_config_path, output_folder_path, rotation, 'x'):
+            return slice_stl_no_support(stl_path, slicer_config_path, output_folder_path, rotation, 'x')
+
+    raise RuntimeError("Failed to slice without warnings after all rotations.")
+
+
+def slice_stl_no_support(stl_path, config_path, output_folder, degrees, axis):
+    output_file_name = f"{os.path.splitext(os.path.basename(stl_path))[0]}.gcode"
+    output_path = os.path.join(output_folder, output_file_name)
     slicer_command = [
         "prusa-slicer-console.exe",
-        "--load", slicer_config_path,
+        "--load", config_path,
+        f"--rotate-{axis}", str(degrees),
         "--slice",
         "--export-gcode",
-        "--output", output_path,  # Directly use the output path
-        file_path  # Directly use the file path
+        "--output", output_path,
+        stl_path
     ]
 
-    print(f'Command: {" ".join(slicer_command)}')
-
+    logger.debug(f"Slicing with {axis.upper()} rotation {degrees} degrees...")
     try:
-        # Run the command and capture output
-        completed_process = subprocess.run(slicer_command, check=True, capture_output=True, text=True)
-        print(completed_process.stdout)
+        result = subprocess.run(slicer_command, check=True, capture_output=True, text=True)
+        logger.debug(result.stdout)
+        if "Detected print stability issues" not in result.stdout:
+            logger.info("Slicing successful with no warnings.")
+            return output_path
     except subprocess.CalledProcessError as err:
-        print("Error occurred while slicing:", err.stderr)
-        raise RuntimeError(f"Slicing failed: {err.stderr}") from err
+        logger.error("Error during slicing:", err.stderr)
 
-    print("\nSlicing complete.")
-    return output_path
-
-
-# def batch_slice(directory: Path, config: str):
-#     """Batch process STL files for slicing in the specified directory."""
-#     # Processing all '*.stl' files in the directory
-#     stl_files = directory.glob("*.stl")
-#     for file in stl_files:
-#         slice_stl(file, config)
+    return None
 
 
 if __name__ == "__main__":
 
     stl_path = "auto_slicer/examples/AR4 servo gripper/AR4_SG1_base.STL"
-    gcode_path = slice_stl(stl_path)
+    gcode_path = slice_stl_brute_force_rotation_no_support(stl_path)

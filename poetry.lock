@@ -111,6 +111,30 @@ files = [
 ]
 
 [[package]]
+name = "common-python-tools"
+version = "0.1.0"
+description = "Shared library of useful code I like for my projects"
+optional = false
+python-versions = "^3.11"
+files = []
+develop = false
+
+[package.source]
+type = "directory"
+url = "../common_python_tools"
+
+[[package]]
+name = "freesimplegui"
+version = "5.1.0"
+description = "The free-forever Python GUI framework."
+optional = false
+python-versions = "*"
+files = [
+    {file = "FreeSimpleGUI-5.1.0-py3-none-any.whl", hash = "sha256:9dee6408bc0df2d30327f775e5e61160085f63d0d1c2f41f83d00cb250e507c2"},
+    {file = "freesimplegui-5.1.0.tar.gz", hash = "sha256:2be084404bac9675a3082df8eb8cea4872121f166fc37298081203961618268f"},
+]
+
+[[package]]
 name = "idna"
 version = "3.7"
 description = "Internationalized Domain Names in Applications (IDNA)"
@@ -232,4 +256,4 @@ test = ["websockets"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "c81afec1fef3280e883a2ae5f6c0edf9de22c428787336c3f21154397f34d2fa"
+content-hash = "5b22ed54697e93276d38774f8e5780b9fb11120f271a60c246f281ab54dd82dc"

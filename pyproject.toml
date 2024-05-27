@@ -11,6 +11,8 @@ python = "^3.12"
 pysimplegui = "^5.0.4"
 requests = "^2.31.0"
 octorest = "^0.4"
+common_python_tools = {path = "../common_python_tools"}
+freesimplegui = "^5.1.0"
 
 [tool.poetry.scripts]
 auto-slicer = "auto_slicer.ui:main"

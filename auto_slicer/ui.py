@@ -1,10 +1,14 @@
-import PySimpleGUI as sg
+import FreeSimpleGUI as sg
 import os
-from typing import List, Tuple
+from typing import List
 from dataclasses import dataclass
+import logging
 
 import auto_slicer.octopi_integration as octopi_integration
 from auto_slicer import slice_stl
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -28,6 +32,7 @@ def create_file_folder_ui() -> str:
     """
 
     layout = [
+        [sg.Checkbox('Preheat Printer Immediately', default=True, key='-PREHEAT-')],
         [sg.Text("Select a STEP, STP, or STL file, or a folder containing STEP, STP, or STL files:")],
         [
             sg.Input(key='-FILE-', enable_events=True),
@@ -49,9 +54,9 @@ def create_file_folder_ui() -> str:
     while True:
         event, values = window.read()
         if event in (sg.WIN_CLOSED, 'Cancel'):
-            print("User cancelled or closed the window.")
+            logger.info("User cancelled or closed the window.")
             break
-        if event == 'OK':
+        elif event == 'OK':
             file_path = values['-FILE-']
             folder_path = values['-FOLDER-']
             if file_path and os.path.exists(file_path):
@@ -62,6 +67,9 @@ def create_file_folder_ui() -> str:
                 return folder_path
             else:
                 sg.popup_error('Please select a valid file or folder.')
+        elif event == '-PREHEAT-':
+            # get the value of the checkbox
+            should_preheat = values['-PREHEAT-']
 
     window.close()
     return None
@@ -95,7 +103,7 @@ def create_parts_ui(parts_list: List[BoMLineItem]) -> List[BoMLineItem]:
     while True:
         event, values = window.read()
         if event in (sg.WIN_CLOSED, 'Cancel'):
-            print("User cancelled or closed the window.")
+            logger.info("User cancelled or closed the window.")
             break
         if event == 'Select All':
             for index in range(len(parts_list)):
@@ -190,20 +198,23 @@ def main():
             file_dict = create_dict_of_files(input_path, ['.step', '.stp', '.stl'])
             parts_data = parts_data_from_file_dict(file_dict)
 
-        print("File dict:", file_dict)
-        print("Parts data:", parts_data)
+        logger.debug("File dict:", file_dict)
+        logger.debug("Parts data:", parts_data)
         mutated_parts_data = create_parts_ui(parts_data)
-        print("Mutated parts data:", mutated_parts_data)
+        logger.debug("Mutated parts data:", mutated_parts_data)
         # Slice each part
+        outputs = []
         for bom_item in mutated_parts_data:
-            print(f'Slicing {bom_item.part_name}.')
+            logger.info(f'Slicing {bom_item.part_name}.')
             # Logic for slicing the part
-            slice_stl.slice_stl(bom_item.file_path)
+            output = slice_stl.slice_stl_brute_force_rotation_no_support(bom_item.file_path)
+            outputs.append(output)
 
+        logger.info(f"Outputs: {outputs}")
         # Upload each part to a cloud service
         gcode_file_dict = create_dict_of_files(input_path, ['.gcode'])
         response = octopi_integration.upload_nested_dict_to_octopi(gcode_file_dict)
-        print("Upload response:", response)
+        logger.info(f"Upload response: {response}")
 
 
 if __name__ == "__main__":
