@@ -109,15 +109,7 @@ pip install poetry
 ```
 
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-#### [OLD] Install git and python
-=======
-
->>>>>>> 926fecf
 #### [OLD] Install git and python 3.11.3
->>>>>>> 7c46fa8 (added linux instructions to readme)
 ```powershell
 winget install -e --id Python.Python.3.12
 winget install --id Git.Git -e --source winget
