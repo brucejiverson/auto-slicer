@@ -8,7 +8,6 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.12"
-pysimplegui = "^5.0.4"
 requests = "^2.31.0"
 octorest = "^0.4"
 common_python_tools = {path = "../common_python_tools"}
@@ -16,6 +15,13 @@ freesimplegui = "^5.1.0"
 
 [tool.poetry.scripts]
 auto-slicer = "auto_slicer.ui:main"
+
+[tool.poetry.group.build.dependencies]
+pytest = "^8.3.3"
+ruff = "^0.7.2"
+pyright = "^1.1.384"
+pytest-cov = "^6.0.0"
+nbstripout = "^0.8.1"
 
 [build-system]
 requires = ["poetry-core"]

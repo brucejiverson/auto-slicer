@@ -6,26 +6,6 @@ Auto-Slicer is a CLI tool designed to automate the slicing of STL files based on
 
 
 ## Dev notes
-### 
-**Other printer to do**
-- push forward with the electronics case?
-   - switch to rear mount?? Why didn't I do this the first time?
-- Camera mount and final camera solution
-- Handle on the top
-- Finish the shunt
-
-**To do**
-- set up the common library and get a logger. Useful for propogating info to user?
-- Option to preheat at the beginning
-- add ui during slicing so user knows whats happening
-- change to FreeSimpleGui
-- Fusion360 faster STL exports
--  Make a better purge solution
--   Added the pre/after gcode sections that prusa slicer appends
--   prints aren't in the middle
--   set up continuous print job creation
-- Option to start printing from the UI --> octorest.start for simple non/continuous
-
 
 ### Use case 1: STEP of assembly
 1. get file
