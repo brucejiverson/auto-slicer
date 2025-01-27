@@ -4,18 +4,29 @@ from typing import List
 from dataclasses import dataclass
 import logging
 
-import auto_slicer.octopi_integration as octopi_integration
-from auto_slicer import slice_stl
-
+from auto_slicer.util import get_config_parameter, set_config_parameter
+from auto_slicer.octopi_integration import pre_heat
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class BoMLineItem:
+    """
+    Represents a Bill of Materials (BoM) line item.
+
+    Attributes:
+        part_name (str): The name of the part.
+        quantity (int): The quantity of the part.
+        file_path (str): The file path associated with the part.
+        slice_warnings (str): Any warnings generated during the slicing process.
+        gcode_path (str): The G-code file path associated with the part.
+    """
     part_name: str
     quantity: int
     file_path: str
+    slice_warnings: str = None
+    gcode_path: str = None
 
 
 DEFAULT_TEXT_SETTINGS = {
@@ -32,14 +43,15 @@ def create_file_folder_ui() -> str:
     """
 
     layout = [
-        [sg.Checkbox('Preheat Printer Immediately', default=True, key='-PREHEAT-')],
+        [sg.Button('Preheat Printer', key='-PREHEAT-')],
+        [sg.Text("Octopi URL:"), sg.InputText(get_config_parameter("url"), key='-URL-'), sg.Button("Update url")],
         [sg.Text("Select a STEP, STP, or STL file, or a folder containing STEP, STP, or STL files:")],
         [
             sg.Input(key='-FILE-', enable_events=True),
             sg.FileBrowse("Browse Files", file_types=(
+                ("STL Files", "*.stl"),
                 ("STEP Files", "*.step"),
-                ("STP Files", "*.stp"),
-                ("STL Files", "*.stl"))),
+                ("STP Files", "*.stp"))),
             ],
         [sg.Text("OR")],
         [
@@ -69,7 +81,13 @@ def create_file_folder_ui() -> str:
                 sg.popup_error('Please select a valid file or folder.')
         elif event == '-PREHEAT-':
             # get the value of the checkbox
-            should_preheat = values['-PREHEAT-']
+            pre_heat()
+        elif event == 'Update url':
+            # get the value of the text input
+            url = values['-URL-']
+            # set the config parameter
+            set_config_parameter("url", url)
+            logger.info("Set URL to %s", url)
 
     window.close()
     return None
@@ -85,6 +103,7 @@ def create_parts_ui(parts_list: List[BoMLineItem]) -> List[BoMLineItem]:
     Returns:
         List[BoMLineItem]: A list of tuples representing the selected parts and their quantities.
     """
+    logger.debug("Parts list: %s", parts_list)
     layout = [
         [
             sg.Checkbox('', default=True, key=f'CHECK_{index}', size=(20, 1)),
@@ -96,7 +115,7 @@ def create_parts_ui(parts_list: List[BoMLineItem]) -> List[BoMLineItem]:
         ]
         for index, bom_item in enumerate(parts_list)
     ]
-    layout.append([sg.Button('Select All'), sg.Button('Clear All'), sg.Button('SLICE'), sg.Button('Cancel')])
+    layout.append([sg.Button('Select All'), sg.Button('Clear All'), sg.Button('SLICE AND UPLOAD'), sg.Button('Cancel')])
 
     window = sg.Window('Select Parts for Processing', layout)
 
@@ -111,7 +130,7 @@ def create_parts_ui(parts_list: List[BoMLineItem]) -> List[BoMLineItem]:
         if event == 'Clear All':
             for index in range(len(parts_list)):
                 window[f'CHECK_{index}'].update(value=False)
-        if event == 'SLICE':
+        if event == 'SLICE AND UPLOAD':
             for index, part_info in enumerate(parts_list):
                 if values[f'CHECK_{index}']:
                     part_info.quantity = int(values[f'QUANTITY_{index}'])
@@ -186,36 +205,3 @@ def parts_data_from_file_dict(file_dict: dict) -> List[BoMLineItem]:
         else:
             raise ValueError("Invalid file_dict format! \n{}".format(file_dict))
     return parts_data
-
-
-def main():
-    input_path = create_file_folder_ui()
-    if input_path:
-        if os.path.isfile(input_path):
-            parts_data = [(os.path.basename(input_path), 1)]
-        else:
-            # Logic for processing a folder
-            file_dict = create_dict_of_files(input_path, ['.step', '.stp', '.stl'])
-            parts_data = parts_data_from_file_dict(file_dict)
-
-        logger.debug("File dict:", file_dict)
-        logger.debug("Parts data:", parts_data)
-        mutated_parts_data = create_parts_ui(parts_data)
-        logger.debug("Mutated parts data:", mutated_parts_data)
-        # Slice each part
-        outputs = []
-        for bom_item in mutated_parts_data:
-            logger.info(f'Slicing {bom_item.part_name}.')
-            # Logic for slicing the part
-            output = slice_stl.slice_stl_brute_force_rotation_no_support(bom_item.file_path)
-            outputs.append(output)
-
-        logger.info(f"Outputs: {outputs}")
-        # Upload each part to a cloud service
-        gcode_file_dict = create_dict_of_files(input_path, ['.gcode'])
-        response = octopi_integration.upload_nested_dict_to_octopi(gcode_file_dict)
-        logger.info(f"Upload response: {response}")
-
-
-if __name__ == "__main__":
-    main()

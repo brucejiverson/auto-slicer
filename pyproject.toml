@@ -10,11 +10,13 @@ readme = "README.md"
 python = "^3.12"
 requests = "^2.31.0"
 octorest = "^0.4"
-common_python_tools = {path = "../common_python_tools"}
 freesimplegui = "^5.1.0"
+common_python_tools = { git = "git@github.com:brucejiverson/common_python_tools.git", rev = "main" }
+# see scripts below for arc slicer
 
 [tool.poetry.scripts]
-auto-slicer = "auto_slicer.ui:main"
+install_custom_package = "pip install git+https://github.com/nicolai-wachenschwan/arc-overhang-prusaslicer-integration.git"
+auto-slicer = "auto_slicer.main:main"
 
 [tool.poetry.group.build.dependencies]
 pytest = "^8.3.3"

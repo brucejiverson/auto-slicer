@@ -1,4 +1,5 @@
 {
     "octoprint_api_key": "you-shall-not-pass",
-    "slicer_config_path": "slicer_profiles/PrusaSlicer_config_bundle.ini"
+    "slicer_config_path": "slicer_profiles/PrusaSlicer_config_bundle.ini",
+    "url": "http://octopi.local"
 }

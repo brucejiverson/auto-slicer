@@ -5,32 +5,6 @@
 Auto-Slicer is a CLI tool designed to automate the slicing of STL files based on a bill of materials (BOM) and manage 3D printing tasks via the OctoPi API.
 
 
-## Dev notes
-
-### Use case 1: STEP of assembly
-1. get file
-2. loop through all the steps
-
-
-### Use case 2: folder with steps/stls (ie a download)
-1. get folder
-2. get bom
-3. walk over that folder converting all step to stl in place
-4. walk over folder for each stl
-
-### Common to both
-   1. auto slice, store gcode in a dict
-   2. Keep metadata for each
-      1. Quantity required
-      2. Print time
-      3. Volume
-      4. Material volume + cost
-      5. bed area
-      6. height
-   3. Upload in organized fashion
-   4. Create a new continous print 
-
-
 
 ## Usage
 To start the auto-slicing process, run:
@@ -41,7 +15,10 @@ poetry run auto-slicer
 
 
 ## Installation and set up
-### Linux
+### Setting up Slicer from the command line
+https://manual.slic3r.org/advanced/command-line
+
+### Setting up a python environment in Linux (recommended workflow)
 #### Install initial tools and pyenv
 ```
 sudo apt update && sudo apt upgrade
@@ -73,6 +50,8 @@ Now, restart the terminal, and run `pyenv` as initial test that pyenv was instal
 
 #### Configure the environment and set up poetry
 Ensure at this time that you have your pyproject.toml file in the root of your project and configured correctly with the poetry standards. If you're just trying to run the tests or examples, you can use the pyproject.toml file in this repo. Otherwise, you should have cloned this project, and you can define the path to this package in your pyproject.toml file.
+
+Check the pyproject.toml file and match the python version for the below commands.
 
 Run the following commands to set up the environment and install poetry:
 ```
@@ -108,12 +87,12 @@ python --version
 pip install poetry
 ```
 
-
+<!-- 
 #### [OLD] Install git and python 3.11.3
 ```powershell
 winget install -e --id Python.Python.3.12
 winget install --id Git.Git -e --source winget
-```
+``` -->
 
 ### 3) setup the development environment
 ```powershell
@@ -137,7 +116,7 @@ python.exe -m poetry install
 ```
 
 ### 4) test the environment works
-Connect the reference design to the computer using USB and run:
+NOTE: NOT IMPLEMENTED
 ```bash
 python.exe -m poetry run cps test
 ```
