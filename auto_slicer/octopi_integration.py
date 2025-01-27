@@ -27,6 +27,7 @@ def get_url() -> str:
 
 
 #  OCTOPI REFERENCE! https://docs.octoprint.org/en/master/api/files.html
+# https://docs.octoprint.org/en/master/api/files.html#upload-file-or-create-folder
 
 def pre_heat(tool_target: int = 150, bed_target: int = 45):
     """

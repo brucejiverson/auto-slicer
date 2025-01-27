@@ -255,7 +255,6 @@ def slice_stl_no_support(stl_path: str, config_path: str, output_folder: str, de
 
             estimate_fraction_of_support_material(output_path)
             
-
     except subprocess.CalledProcessError as err:
         logger.error("Error during slicing: %s", err.stderr)
     return None

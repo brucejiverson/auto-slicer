@@ -9,9 +9,6 @@ from auto_slicer import ui
 logger = logging.getLogger(__name__)
 
 
-
-
-
 def main():
     """
     Main function to handle the slicing and uploading of 3D model files.
