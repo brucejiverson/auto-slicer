@@ -186,7 +186,8 @@ def run(context):
 
             if "(" in body_name and ")" in body_name and body_name.index("(") < body_name.index(
                     ")") and len(body_name.split("(")[1].replace(")", "").strip().split(",")) == 3:
-                export_body_name, temp_transforms = apply_transformations(body, body_name, root_comp, comp, logger)
+                export_body_name, temp_transforms = apply_transformations(
+                    body, body_name, root_comp, comp, logger)
             else:
                 temp_transforms = []
 

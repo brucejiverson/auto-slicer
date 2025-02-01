@@ -29,7 +29,7 @@ def get_url() -> str:
 #  OCTOPI REFERENCE! https://docs.octoprint.org/en/master/api/files.html
 # https://docs.octoprint.org/en/master/api/files.html#upload-file-or-create-folder
 
-def pre_heat(tool_target: int = 150, bed_target: int = 45):
+def pre_heat(tool_target: int = 150, bed_target: int = 45) -> None:
     """
     Preheat the 3D printer to the specified tool and bed temperatures.
 
@@ -39,8 +39,11 @@ def pre_heat(tool_target: int = 150, bed_target: int = 45):
 
     Returns:
         None
+
+    Raises:
+        requests.exceptions.RequestException: If there is an issue with the network request.
     """
-    print(f'Preheating to {tool_target}C and {bed_target}C')
+    logger.info('Preheating to %dC and %dC', tool_target, bed_target)
     client = OctoRest(url=get_url(), apikey=get_api_key())
     client.tool_target(tool_target)
     client.bed_target(bed_target)
@@ -72,20 +75,32 @@ def upload_nested_dict_to_octopi(gcode_dict: dict, parent_folders: str = ""):
             # create a folder
             response = client.new_folder(folder_name)
             print("Folder creation successful:", response)
-            upload_nested_dict_to_octopi(value, f'{parent_folders}/{folder_name}/')
+            upload_nested_dict_to_octopi(
+                value, f'{parent_folders}/{folder_name}/')
         elif isinstance(value, list):
             for file_path in value:
                 print(f'uploading {file_path} to {folder_path_from_parent}')
-                result = client.upload(file_path, path=folder_path_from_parent, location="local")
+                result = client.upload(
+                    file_path,
+                    path=folder_path_from_parent,
+                    location="local")
                 if not result["done"]:
-                    raise RuntimeError(f"Failed to upload {file_path} to {folder_path_from_parent}")
+                    raise RuntimeError(
+                        f"Failed to upload {file_path} to {folder_path_from_parent}")
                 else:
                     logger.info("Upload successful for %s", file_path)
         else:
-            raise ValueError("Invalid gcode_dict format! \n{}".format(gcode_dict))
+            raise ValueError(
+                "Invalid gcode_dict format! \n{}".format(gcode_dict))
 
 
-def add_set_to_continous_print(path, sd=False, count=1, jobName="Job", jobDraft=True, timeout=10):
+def add_set_to_continous_print(
+        path,
+        sd=False,
+        count=1,
+        jobName="Job",
+        jobDraft=True,
+        timeout=10):
     """
     Adds a set to the continuous print queue in OctoPrint.
 

@@ -1,8 +1,8 @@
 import json
 import shutil
 import os
-
 import logging
+
 
 logger = logging.getLogger(__name__)
 
@@ -25,12 +25,14 @@ def get_config_parameter(parameter: str) -> str:
         shutil.copy(template_path, config_path)
         logger.warning(
             'config.json not found. Copied %s to %s. Please fill out the information.',
-            template_path, config_path
-        )
+            template_path,
+            config_path)
 
     with open(config_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
-        return data.get(parameter, f"Parameter '{parameter}' not found in the config file.")
+        return data.get(
+            parameter,
+            f"Parameter '{parameter}' not found in the config file.")
 
 
 def set_config_parameter(parameter: str, value: str):

@@ -6,6 +6,7 @@ import FreeCAD as App
 import Part
 import Mesh
 
+
 def process_step_assembly(input_file: str, output_folder: str) -> None:
     """
     Process a STEP assembly file, record metadata for each part, and export to STL.
@@ -20,7 +21,7 @@ def process_step_assembly(input_file: str, output_folder: str) -> None:
     stl_folder = os.path.join(output_folder, "Converted-STLs")
     if not os.path.exists(stl_folder):
         os.makedirs(stl_folder)
-    
+
     # Load the STEP file
     doc = App.openDocument(input_file)
     doc.recompute()
@@ -38,7 +39,8 @@ def process_step_assembly(input_file: str, output_folder: str) -> None:
             # Calculate metadata (placeholders for example)
             volume = obj.Shape.Volume  # in cubic mm
             material_volume = volume  # assuming solid fill, in cubic mm
-            bed_area = obj.Shape.BoundBox.XLength * obj.Shape.BoundBox.YLength  # in square mm
+            bed_area = obj.Shape.BoundBox.XLength * \
+                obj.Shape.BoundBox.YLength  # in square mm
             height = obj.Shape.BoundBox.ZLength  # in mm
 
             # Append metadata
@@ -59,19 +61,17 @@ def process_step_assembly(input_file: str, output_folder: str) -> None:
     # Clean up
     doc.close()
 
+
 # Example usage
 process_step_assembly("path_to_step_file.step", "output_directory")
-
-
-
 
 
 if __name__ == '__main__':
     import sys
     sys.path.append('..')
-    
+
     import os
     from pathlib import Path
-    
+
     # this directory
-    assembly_step_path = Path(os.getcwd()) / 'Assembly Test 02.step' 
+    assembly_step_path = Path(os.getcwd()) / 'Assembly Test 02.step'

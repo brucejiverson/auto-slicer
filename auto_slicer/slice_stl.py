@@ -22,8 +22,12 @@ def estimate_nozzle_and_layer_height(gcode_file: str) -> tuple[float, float]:
     nozzle_diameter = None
     layer_height = None
 
-    nozzle_re = re.compile(r';\s*nozzle_diameter\s*=\s*([\d.]+)', re.IGNORECASE)
-    layer_height_re = re.compile(r';\s*layer_height\s*=\s*([\d.]+)', re.IGNORECASE)
+    nozzle_re = re.compile(
+        r';\s*nozzle_diameter\s*=\s*([\d.]+)',
+        re.IGNORECASE)
+    layer_height_re = re.compile(
+        r';\s*layer_height\s*=\s*([\d.]+)',
+        re.IGNORECASE)
 
     with open(gcode_file, 'r', encoding='utf-8') as file:
         for line in file:
@@ -44,12 +48,16 @@ def estimate_nozzle_and_layer_height(gcode_file: str) -> tuple[float, float]:
                 break
 
     if nozzle_diameter is None or layer_height is None:
-        raise ValueError("Could not estimate nozzle diameter or layer height from the G-code file.")
+        raise ValueError(
+            "Could not estimate nozzle diameter or layer height from the G-code file.")
 
     return nozzle_diameter, layer_height
 
 
-def estimate_support_volume(gcode_file: str, nozzle_diameter: float, layer_height: float) -> float:
+def estimate_support_volume(
+        gcode_file: str,
+        nozzle_diameter: float,
+        layer_height: float) -> float:
     """
     Calculate the volume of support material from a G-code file.
 
@@ -74,7 +82,8 @@ def estimate_support_volume(gcode_file: str, nozzle_diameter: float, layer_heigh
             # Detect support material using the updated comment
             if ";TYPE:Support material" in line:
                 is_support = True
-            elif ";TYPE:" in line:  # Detect the start of a new type (e.g., perimeters, infill)
+            # Detect the start of a new type (e.g., perimeters, infill)
+            elif ";TYPE:" in line:
                 is_support = False
 
             # Check for extrusion commands
@@ -91,7 +100,10 @@ def estimate_support_volume(gcode_file: str, nozzle_diameter: float, layer_heigh
     return support_volume
 
 
-def estiamte_non_support_volume(gcode_file: str, nozzle_diameter: float, layer_height: float) -> float:
+def estiamte_non_support_volume(
+        gcode_file: str,
+        nozzle_diameter: float,
+        layer_height: float) -> float:
     """
     Calculate the volume of non-support material from a G-code file.
 
@@ -116,7 +128,8 @@ def estiamte_non_support_volume(gcode_file: str, nozzle_diameter: float, layer_h
             # Detect support material using the updated comment
             if ";TYPE:Support material" in line:
                 is_support = True
-            elif ";TYPE:" in line:  # Detect the start of a new type (e.g., perimeters, infill)
+            # Detect the start of a new type (e.g., perimeters, infill)
+            elif ";TYPE:" in line:
                 is_support = False
 
             # Check for extrusion commands
@@ -143,9 +156,12 @@ def estimate_fraction_of_support_material(gcode_file: str) -> float:
     Returns:
         float: Fraction of support material.
     """
-    nozzle_diameter_mm, layer_height_mm = estimate_nozzle_and_layer_height(gcode_file)
-    support_volume = estimate_support_volume(gcode_file, nozzle_diameter_mm, layer_height_mm)
-    non_support_volume = estiamte_non_support_volume(gcode_file, nozzle_diameter_mm, layer_height_mm)
+    nozzle_diameter_mm, layer_height_mm = estimate_nozzle_and_layer_height(
+        gcode_file)
+    support_volume = estimate_support_volume(
+        gcode_file, nozzle_diameter_mm, layer_height_mm)
+    non_support_volume = estiamte_non_support_volume(
+        gcode_file, nozzle_diameter_mm, layer_height_mm)
 
     total_volume = support_volume + non_support_volume
 
@@ -161,18 +177,22 @@ def estimate_fraction_of_support_material(gcode_file: str) -> float:
     return support_volume / total_volume
 
 
-def slice_stl_brute_force_rotation_no_support(stl_path: str, output_folder_path: str | None = None) -> str:
+def slice_stl_brute_force_rotation_no_support(
+        stl_path: str,
+        slicer_config_path: str,
+        output_folder_path: str | None = None) -> str:
     """Slices an STL file and attempts rotations on two axes in 90-degree increments if needed due to warnings.
 
     Args:
-        stl_path (str): Path to the STL file.
-        output_folder_path (str | None): Folder to save the sliced G-code files (optional, defaults to same folder as STL file).
+    stl_path (str): Path to the STL file.
+    slicer_config_path (str): Path to the slicer configuration file.
+    output_folder_path (str | None): Folder to save the sliced G-code files
+    (optional, defaults to same folder as STL file).
 
     Returns:
-        str: Path to the successfully sliced G-code file.
+    str: Path to the successfully sliced G-code file.
     """
     max_rotation = 360
-    slicer_config_path = get_config_parameter("slicer_config_path")
 
     if output_folder_path is None:
         output_folder_path = os.path.dirname(stl_path)
@@ -182,19 +202,21 @@ def slice_stl_brute_force_rotation_no_support(stl_path: str, output_folder_path:
 
     # Try rotations on Y-axis
     for rotation in range(0, max_rotation, 90):
-        sliced_path = slice_stl_no_support(stl_path, slicer_config_path, output_folder_path, rotation, 'y')       
+        sliced_path = slice_stl_no_support(
+            stl_path, slicer_config_path, output_folder_path, rotation, 'y')
         if sliced_path is not None:
             # delete previously generated files and return the current one
             for file in generated_files:
                 os.remove(file)
-                
+
             return sliced_path
         if sliced_path is not None:
             generated_files.append(sliced_path)
 
     # Try rotations on X-axis
     for rotation in (90, 270):
-        sliced_path = slice_stl_no_support(stl_path, slicer_config_path, output_folder_path, rotation, 'x')
+        sliced_path = slice_stl_no_support(
+            stl_path, slicer_config_path, output_folder_path, rotation, 'x')
         if sliced_path is not None:
             # delete previously generated files and return the current one
             for file in generated_files:
@@ -206,7 +228,12 @@ def slice_stl_brute_force_rotation_no_support(stl_path: str, output_folder_path:
     raise RuntimeError("Failed to slice without warnings after all rotations.")
 
 
-def slice_stl_no_support(stl_path: str, config_path: str, output_folder: str, degrees: int, axis: str) -> str | None:
+def slice_stl_no_support(
+        stl_path: str,
+        config_path: str,
+        output_folder: str,
+        degrees: int,
+        axis: str) -> str | None:
     """Slices an STL file without support and rotates it by a specified degree on a specified axis.
 
     Useful references:
@@ -223,7 +250,9 @@ def slice_stl_no_support(stl_path: str, config_path: str, output_folder: str, de
     Returns:
         str | None: Path to the successfully sliced G-code file, or None if slicing failed.
     """
-    output_file_name = f"{os.path.splitext(os.path.basename(stl_path))[0]}.gcode"
+    output_file_name = f"{
+        os.path.splitext(
+            os.path.basename(stl_path))[0]}.gcode"
     output_path = os.path.join(output_folder, output_file_name)
     slicer_command = [
         "prusa-slicer-console.exe",
@@ -235,26 +264,38 @@ def slice_stl_no_support(stl_path: str, config_path: str, output_folder: str, de
         stl_path
     ]
 
-    logger.debug("Slicing with %s rotation %d degrees...", axis.upper(), degrees)
+    logger.debug(
+        "Slicing with %s rotation %d degrees...",
+        axis.upper(),
+        degrees)
 
     try:
-        result = subprocess.run(slicer_command, check=True, capture_output=True, text=True)
+        result = subprocess.run(
+            slicer_command,
+            check=True,
+            capture_output=True,
+            text=True)
         logger.debug(result.stdout)
         if "Detected print stability issues" not in result.stdout:
             logger.info("Slicing successful with no warnings.")
             return output_path
         else:
             # get the location of the error message
-            warning_start_idx = result.stdout.index("Detected print stability issues:")
+            warning_start_idx = result.stdout.index(
+                "Detected print stability issues:")
             warning_start_idx += len("Detected print stability issues:") + 1
 
             # find the next newline character after the warning start
             warning_end_idx = result.stdout.index("\n", warning_start_idx)
-            logger.debug(f'warning idxs {warning_start_idx} {warning_end_idx}')
-            logger.debug('Detected warnings: %s', result.stdout[warning_start_idx:warning_end_idx]) 
+            logger.debug(
+                'warning idxs %d %d',
+                warning_start_idx,
+                warning_end_idx)
+            logger.debug('Detected warnings: %s',
+                         result.stdout[warning_start_idx:warning_end_idx])
 
             estimate_fraction_of_support_material(output_path)
-            
+
     except subprocess.CalledProcessError as err:
         logger.error("Error during slicing: %s", err.stderr)
     return None

@@ -1,8 +1,9 @@
-import FreeSimpleGUI as sg
 import os
 from typing import List
 from dataclasses import dataclass
 import logging
+
+import FreeSimpleGUI as sg
 
 from auto_slicer.util import get_config_parameter, set_config_parameter
 from auto_slicer.octopi_integration import pre_heat
@@ -34,7 +35,7 @@ DEFAULT_TEXT_SETTINGS = {
 }
 
 
-def create_file_folder_ui() -> str:
+def create_file_folder_ui() -> str | None:
     """
     Create a GUI to allow the user to select a file or folder.
 
@@ -52,7 +53,7 @@ def create_file_folder_ui() -> str:
                 ("STL Files", "*.stl"),
                 ("STEP Files", "*.step"),
                 ("STP Files", "*.stp"))),
-            ],
+        ],
         [sg.Text("OR")],
         [
             sg.Input(key='-FOLDER-', enable_events=True),
@@ -82,6 +83,8 @@ def create_file_folder_ui() -> str:
         elif event == '-PREHEAT-':
             # get the value of the checkbox
             pre_heat()
+            # inform the user
+            sg.popup('Printer is preheating!')
         elif event == 'Update url':
             # get the value of the text input
             url = values['-URL-']
@@ -93,7 +96,8 @@ def create_file_folder_ui() -> str:
     return None
 
 
-def create_parts_ui(parts_list: List[BoMLineItem]) -> List[BoMLineItem]:
+def create_part_selection_ui(
+        parts_list: List[BoMLineItem]) -> List[BoMLineItem]:
     """
     Create a GUI to display parts with checkboxes and editable quantities, allowing selection for processing.
 
@@ -115,7 +119,8 @@ def create_parts_ui(parts_list: List[BoMLineItem]) -> List[BoMLineItem]:
         ]
         for index, bom_item in enumerate(parts_list)
     ]
-    layout.append([sg.Button('Select All'), sg.Button('Clear All'), sg.Button('SLICE AND UPLOAD'), sg.Button('Cancel')])
+    layout.append([sg.Button('Select All'), sg.Button('Clear All'),
+                  sg.Button('CONTINUE'), sg.Button('Cancel')])
 
     window = sg.Window('Select Parts for Processing', layout)
 
@@ -130,12 +135,69 @@ def create_parts_ui(parts_list: List[BoMLineItem]) -> List[BoMLineItem]:
         if event == 'Clear All':
             for index in range(len(parts_list)):
                 window[f'CHECK_{index}'].update(value=False)
-        if event == 'SLICE AND UPLOAD':
+        if event == 'CONTINUE':
             for index, part_info in enumerate(parts_list):
                 if values[f'CHECK_{index}']:
                     part_info.quantity = int(values[f'QUANTITY_{index}'])
             window.close()
             return parts_list
+
+
+def create_slicer_config_selection_ui(config_options: List[str]) -> str:
+    """
+    Create a GUI to allow the user to select a slicer configuration from a dropdown list or set up a new configuration.
+
+    Args:
+        config_options (List[str]): A list of available slicer configuration options.
+
+    Returns:
+        str: The selected slicer configuration option.
+    """
+    layout = [
+        [sg.Text("Select a Slicer Configuration:")],
+        [sg.Combo(config_options, key='-CONFIG-', readonly=True)],
+        [sg.Button('Continue'), sg.Button('Cancel')],
+        [sg.Text("OR")],
+        [sg.Text("Set up a new configuration:")],
+        [
+            sg.Input(key='-NEW_CONFIG-', enable_events=True),
+            sg.FileBrowse("Browse Files", file_types=(("Config Files", "*.ini"), ("All Files", "*.*"))),
+        ],
+        [sg.Button('Add Config')]
+    ]
+
+    window = sg.Window('Slicer Configuration Selection', layout)
+
+    while True:
+        event, values = window.read()
+        if event in (sg.WIN_CLOSED, 'Cancel'):
+            logger.debug("User cancelled or closed the window.")
+            break
+        elif event == 'Continue':
+            config_selection = values['-CONFIG-']
+            if config_selection:
+                window.close()
+                return config_selection
+            sg.popup_error('Please select a valid configuration.')
+        elif event == 'Add Config':
+            new_config_path = values['-NEW_CONFIG-']
+            if new_config_path and os.path.exists(new_config_path):
+                slicer_profiles_folder = os.path.join(
+                    os.getcwd(), 'slicer_profiles')
+                if not os.path.exists(slicer_profiles_folder):
+                    os.makedirs(slicer_profiles_folder)
+                new_config_name = os.path.basename(new_config_path)
+                destination_path = os.path.join(
+                    slicer_profiles_folder, new_config_name)
+                os.rename(new_config_path, destination_path)
+                sg.popup('Configuration added successfully by moving the .ini file into ./slicer_profiles.')
+                config_options.append(new_config_name)
+                window['-CONFIG-'].update(values=config_options)
+            else:
+                sg.popup_error('Please select a valid file.')
+
+    window.close()
+    return None
 
 
 def clean_file_dict(file_dict) -> dict:
@@ -153,7 +215,9 @@ def clean_file_dict(file_dict) -> dict:
     return cleaned_dict
 
 
-def create_dict_of_files(folder_path: str, valid_extensions: list[str]) -> dict:
+def create_dict_of_files(
+        folder_path: str,
+        valid_extensions: list[str]) -> dict:
     """
     Get a dictionary of files in a folder with valid file extensions organized heirarchically.
 
@@ -193,7 +257,8 @@ def parts_data_from_file_dict(file_dict: dict) -> List[BoMLineItem]:
     """
 
     parts_data = []
-    # here value will either be another dict representing a subfolder or a list of file paths
+    # here value will either be another dict representing a subfolder or a
+    # list of file paths
     for folder_name, value in file_dict.items():
         if isinstance(value, dict):
             parts_data.extend(parts_data_from_file_dict(value))
@@ -203,5 +268,6 @@ def parts_data_from_file_dict(file_dict: dict) -> List[BoMLineItem]:
                     BoMLineItem(os.path.basename(file_path), 1, file_path)
                 )
         else:
-            raise ValueError("Invalid file_dict format! \n{}".format(file_dict))
+            raise ValueError(
+                "Invalid file_dict format! \n{}".format(file_dict))
     return parts_data

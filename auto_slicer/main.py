@@ -27,23 +27,57 @@ def main():
     input_path = ui.create_file_folder_ui()
     if input_path:
         if os.path.isfile(input_path):
-            parts_data = [ui.BoMLineItem(os.path.basename(input_path), 1, input_path)]
+            parts_data = [
+                ui.BoMLineItem(
+                    os.path.basename(input_path),
+                    1,
+                    input_path)]
 
         else:
             # Logic for processing a folder
-            file_dict = ui.create_dict_of_files(input_path, ['.step', '.stp', '.stl'])
+            file_dict = ui.create_dict_of_files(
+                input_path, ['.step', '.stp', '.stl'])
             logger.debug("File dict: %s", file_dict)
             parts_data = ui.parts_data_from_file_dict(file_dict)
 
         logger.debug("Parts data: %s", parts_data)
-        mutated_parts_data = ui.create_parts_ui(parts_data)
+        mutated_parts_data = ui.create_part_selection_ui(parts_data)
         logger.debug("Mutated parts data: %s", mutated_parts_data)
+
+        # select slicer configuration file
+        logger.debug("Cur dir: %s", os.getcwd())
+        slicer_config_files = [f for f in os.listdir(
+            './slicer_profiles') if f.endswith('.ini')]
+        logger.debug("Slicer config files: %s", slicer_config_files)
+
+        if len(slicer_config_files) == 0:
+            raise FileNotFoundError(
+                "No slicer configuration files found in the slicer_profiles folder.")
+        elif len(slicer_config_files) == 1:
+            slicer_config_path = os.path.join(
+                './slicer_profiles', slicer_config_files[0])
+            logger.info(
+                "Using slicer configuration file: %s",
+                slicer_config_path)
+        else:
+            logger.info("Multiple slicer configuration files found.")
+            slicer_config_file = ui.create_slicer_config_selection_ui(
+                slicer_config_files)
+            slicer_config_path = os.path.join(
+                './slicer_profiles', slicer_config_file)
+            logger.info(
+                "Using slicer configuration file: %s",
+                slicer_config_path)
+
         # Slice each part
         outputs = []
         for bom_item in mutated_parts_data:
             logger.info('Slicing %s.', bom_item.part_name)
             # Logic for slicing the part
-            output = slice_stl.slice_stl_brute_force_rotation_no_support(bom_item.file_path)
+            output = slice_stl.slice_stl_brute_force_rotation_no_support(
+                bom_item.file_path,
+                slicer_config_path
+            )
             bom_item.gcode_path = output
             outputs.append(output)
 
@@ -51,7 +85,8 @@ def main():
         # Upload each part to a cloud service
         gcode_file_dict = ui.create_dict_of_files(input_path, ['.gcode'])
         logger.debug("Gcode file dict: %s", gcode_file_dict)
-        # gcode_file_dict is a heirarchical dictionary of files with the values being the file paths. clean out against the outputs list
+        # gcode_file_dict is a heirarchical dictionary of files with the values
+        # being the file paths. clean out against the outputs list
 
         def find_keys_to_remove(d, outputs):
             keys_to_remove = []
@@ -64,7 +99,9 @@ def main():
 
         keys_to_remove = find_keys_to_remove(gcode_file_dict, outputs)
         for key in keys_to_remove:
-            logger.debug("G-code file %s not found in outputs list.", gcode_file_dict[key])
+            logger.debug(
+                "G-code file %s not found in outputs list.",
+                gcode_file_dict[key])
             del gcode_file_dict[key]
         logger.debug("G-code file dict after cleaning: %s", gcode_file_dict)
         octopi_integration.upload_nested_dict_to_octopi(gcode_file_dict)
