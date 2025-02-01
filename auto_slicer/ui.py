@@ -2,11 +2,13 @@ import os
 from typing import List
 from dataclasses import dataclass
 import logging
+import asyncio
 
 import FreeSimpleGUI as sg
 
 from auto_slicer.util import get_config_parameter, set_config_parameter
-from auto_slicer.octopi_integration import pre_heat
+from auto_slicer.octopi_integration import pre_heat, initialize_client, is_print_job_active
+
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +37,7 @@ DEFAULT_TEXT_SETTINGS = {
 }
 
 
-def create_file_folder_ui() -> str | None:
+async def create_stl_file_selection_ui() -> str | None:
     """
     Create a GUI to allow the user to select a file or folder.
 
@@ -44,6 +46,9 @@ def create_file_folder_ui() -> str | None:
     """
 
     layout = [
+        [
+            sg.Text("Octopi print job is currently running:"),
+            sg.Text(str(await is_print_job_active()).upper(), key='-STATUS-', size=(20, 1))],
         [sg.Button('Preheat Printer', key='-PREHEAT-')],
         [sg.Text("Octopi URL:"), sg.InputText(get_config_parameter("url"), key='-URL-'), sg.Button("Update url")],
         [sg.Text("Select a STEP, STP, or STL file, or a folder containing STEP, STP, or STL files:")],
@@ -62,14 +67,22 @@ def create_file_folder_ui() -> str | None:
         [sg.Button('OK'), sg.Button('Cancel')]
     ]
 
-    window = sg.Window('File/Folder Selection', layout)
+    window = sg.Window('File/Folder Selection', layout, finalize=True)
+    asyncio.create_task(initialize_client())
 
-    while True:
-        event, values = window.read()
-        if event in (sg.WIN_CLOSED, 'Cancel'):
-            logger.info("User cancelled or closed the window.")
-            break
-        elif event == 'OK':
+    async def update_printer_status():
+        while True:
+            try:
+                status = await is_print_job_active()
+                window['-STATUS-'].update(str(status).upper())
+            except Exception as e:
+                window['-STATUS-'].update(f'Error: {e}')
+            await asyncio.sleep(10)
+
+    status_update_task = asyncio.create_task(update_printer_status())
+
+    async def event_handler(event, values) -> str | None:
+        if event == 'OK':
             file_path = values['-FILE-']
             folder_path = values['-FOLDER-']
             if file_path and os.path.exists(file_path):
@@ -81,19 +94,31 @@ def create_file_folder_ui() -> str | None:
             else:
                 sg.popup_error('Please select a valid file or folder.')
         elif event == '-PREHEAT-':
-            # get the value of the checkbox
-            pre_heat()
-            # inform the user
-            sg.popup('Printer is preheating!')
+            try:
+                await pre_heat()
+                sg.popup('Printer is preheating!')
+            except Exception as e:
+                sg.popup_error(f'Failed to preheat printer: {e}')
         elif event == 'Update url':
-            # get the value of the text input
             url = values['-URL-']
-            # set the config parameter
             set_config_parameter("url", url)
             logger.info("Set URL to %s", url)
+            asyncio.create_task(initialize_client())
 
-    window.close()
-    return None
+    async def event_loop():
+        while True:
+            event, values = window.read()
+            if event in (sg.WIN_CLOSED, 'Cancel'):
+                logger.info("User cancelled or closed the window.")
+                break
+            result = await event_handler(event, values)
+            await asyncio.sleep(0.01)
+            if result:
+                status_update_task.cancel()
+                window.close()
+                return result
+
+    return await event_loop()
 
 
 def create_part_selection_ui(
@@ -190,7 +215,8 @@ def create_slicer_config_selection_ui(config_options: List[str]) -> str:
                 destination_path = os.path.join(
                     slicer_profiles_folder, new_config_name)
                 os.rename(new_config_path, destination_path)
-                sg.popup('Configuration added successfully by moving the .ini file into ./slicer_profiles.')
+                sg.popup(
+                    'Configuration added successfully by moving the .ini file into ./slicer_profiles.')
                 config_options.append(new_config_name)
                 window['-CONFIG-'].update(values=config_options)
             else:

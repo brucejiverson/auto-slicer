@@ -1,6 +1,8 @@
 import logging
 import requests
+
 from octorest import OctoRest
+
 from auto_slicer.util import get_config_parameter
 
 logger = logging.getLogger(__name__)
@@ -28,8 +30,72 @@ def get_url() -> str:
 
 #  OCTOPI REFERENCE! https://docs.octoprint.org/en/master/api/files.html
 # https://docs.octoprint.org/en/master/api/files.html#upload-file-or-create-folder
+# example script
+# https://github.com/dougbrion/OctoRest/blob/master/examples/basic/basic.py
 
-def pre_heat(tool_target: int = 150, bed_target: int = 45) -> None:
+client: OctoRest | None = None
+
+
+async def initialize_client() -> OctoRest:
+    """
+    Initialize the OctoRest client.
+
+    Returns:
+        None
+    """
+    global client
+    if client is None:
+        try:
+            logger.info("Initializing OctoRest client.")
+            client = OctoRest(url=get_url(), apikey=get_api_key())
+            logger.info("OctoRest client initialized and connected.")
+            return client
+        except Exception as e:
+            logger.error("Failed to initialize OctoRest client.")
+            raise e
+    else:
+        logger.debug("OctoRest client already initialized.")
+        return client
+
+
+async def is_print_job_active() -> bool:
+    """
+    Check if a print job is currently active.
+
+    Returns:
+        bool: True if a print job is active, False otherwise.
+    """
+    global client
+    if client is None:
+        await initialize_client()
+
+    return client.printer()['state']['flags']['printing']
+
+
+async def get_printer_info() -> dict:
+    """
+    Get the information of the printer.
+
+    Returns:
+        dict: The JSON response from the OctoPrint server.
+    """
+    global client
+    if client is None:
+        await initialize_client()
+
+    message = ""
+    message += str(client.version) + "\n"
+    message += str(client.job_info()) + "\n"
+    printing = client.printer()['state']['flags']['printing']
+    if printing:
+        message += "Currently printing!\n"
+    else:
+        message += "Not currently printing...\n"
+    logger.info(message)
+    return message
+
+
+async def pre_heat(tool_target: int = 150, bed_target: int = 45) -> None:
     """
     Preheat the 3D printer to the specified tool and bed temperatures.
 
@@ -44,12 +110,22 @@ def pre_heat(tool_target: int = 150, bed_target: int = 45) -> None:
         requests.exceptions.RequestException: If there is an issue with the network request.
     """
     logger.info('Preheating to %dC and %dC', tool_target, bed_target)
-    client = OctoRest(url=get_url(), apikey=get_api_key())
-    client.tool_target(tool_target)
-    client.bed_target(bed_target)
+
+    global client
+    if client is None:
+        await initialize_client()
+
+    if not await is_print_job_active():
+        client.tool_target(tool_target)
+        client.bed_target(bed_target)
+    else:
+        logger.error("Cannot preheat while a print job is active.")
+        raise RuntimeError("Cannot preheat while a print job is active.")
 
 
-def upload_nested_dict_to_octopi(gcode_dict: dict, parent_folders: str = ""):
+async def upload_nested_dict_to_octopi(
+        gcode_dict: dict,
+        parent_folders: str = ""):
     """
     Recursively uploads gcode files to OctoPrint.
 
@@ -62,7 +138,9 @@ def upload_nested_dict_to_octopi(gcode_dict: dict, parent_folders: str = ""):
         bool: True if upload is successful, False otherwise.
     """
     logger.info("Uploading gcode files to OctoPrint.")
-    client = OctoRest(url=get_url(), apikey=get_api_key())
+    global client
+    if client is None:
+        await initialize_client()
 
     for folder_name, value in gcode_dict.items():
         folder_path_from_parent = parent_folders + folder_name
@@ -75,7 +153,7 @@ def upload_nested_dict_to_octopi(gcode_dict: dict, parent_folders: str = ""):
             # create a folder
             response = client.new_folder(folder_name)
             print("Folder creation successful:", response)
-            upload_nested_dict_to_octopi(
+            await upload_nested_dict_to_octopi(
                 value, f'{parent_folders}/{folder_name}/')
         elif isinstance(value, list):
             for file_path in value:

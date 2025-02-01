@@ -1,15 +1,16 @@
 import os
 import logging
+import asyncio
 
 from auto_slicer import octopi_integration
 from auto_slicer import slice_stl
 from auto_slicer import ui
-
+from auto_slicer.definitions import BoMLineItem
 
 logger = logging.getLogger(__name__)
 
 
-def main():
+async def main():
     """
     Main function to handle the slicing and uploading of 3D model files.
     This function performs the following steps:
@@ -24,11 +25,11 @@ def main():
         None
     """
 
-    input_path = ui.create_file_folder_ui()
+    input_path = await ui.create_stl_file_selection_ui()
     if input_path:
         if os.path.isfile(input_path):
             parts_data = [
-                ui.BoMLineItem(
+                BoMLineItem(
                     os.path.basename(input_path),
                     1,
                     input_path)]
@@ -45,7 +46,6 @@ def main():
         logger.debug("Mutated parts data: %s", mutated_parts_data)
 
         # select slicer configuration file
-        logger.debug("Cur dir: %s", os.getcwd())
         slicer_config_files = [f for f in os.listdir(
             './slicer_profiles') if f.endswith('.ini')]
         logger.debug("Slicer config files: %s", slicer_config_files)
@@ -107,5 +107,24 @@ def main():
         octopi_integration.upload_nested_dict_to_octopi(gcode_file_dict)
 
 
-if __name__ == "__main__":
-    main()
+def poetry_main():
+    """
+    Entry point for the auto_slicer application when using Poetry.
+    This function initializes the asyncio event loop and runs the main coroutine
+    until it completes.
+    Note:
+        Ensure that the `main` coroutine is defined elsewhere in the codebase.
+    Raises:
+        Any exceptions raised by the `main` coroutine.
+    """
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())
+    pending = asyncio.all_tasks(loop)
+    for task in pending:
+        task.cancel()
+        try:
+            loop.run_until_complete(task)
+        except asyncio.CancelledError:
+            pass
+    loop.close()

@@ -16,7 +16,7 @@ common_python_tools = { git = "git@github.com:brucejiverson/common_python_tools.
 
 [tool.poetry.scripts]
 install_custom_package = "pip install git+https://github.com/nicolai-wachenschwan/arc-overhang-prusaslicer-integration.git"
-auto-slicer = "auto_slicer.main:main"
+auto-slicer = "auto_slicer.main:poetry_main"
 
 [tool.poetry.group.build.dependencies]
 pytest = "^8.3.3"
