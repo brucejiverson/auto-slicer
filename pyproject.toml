@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "auto_slicer"
-version = "0.1.0"
+version = "0.2.0"
 description = "Auto-Slicer automates the slicing of STEP or STL files and uploads Gcode to Octoprint."
 authors = ["brucejiverson <brucejamesiverson@gmail.com>"]
 license = "MIT"
@@ -19,11 +19,21 @@ install_custom_package = "pip install git+https://github.com/nicolai-wachenschwa
 auto-slicer = "auto_slicer.main:poetry_main"
 
 [tool.poetry.group.build.dependencies]
-pytest = "^8.3.3"
 ruff = "^0.7.2"
 pyright = "^1.1.384"
 pytest-cov = "^6.0.0"
 nbstripout = "^0.8.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.4"
+pytest-asyncio = "^0.25.3"
+pytest-mock = "^3.14.0"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+pythonpath = ["."]
 
 [build-system]
 requires = ["poetry-core"]

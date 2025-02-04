@@ -3,11 +3,19 @@ import requests
 
 from octorest import OctoRest
 
+from auto_slicer.definitions import STLBoM, RemoteFile, RemoteObjectTypes
 from auto_slicer.util import get_config_parameter
 
 logger = logging.getLogger(__name__)
 
 
+#  OCTOPI REFERENCE! https://docs.octoprint.org/en/master/api/files.html
+# https://docs.octoprint.org/en/master/api/files.html#upload-file-or-create-folder
+# example script
+# https://github.com/dougbrion/OctoRest/blob/master/examples/basic/basic.py
+
+
+# BASIC FUNCTIONS
 def get_api_key() -> str:
     """
     Retrieve the OctoPrint API key from the configuration.
@@ -27,11 +35,6 @@ def get_url() -> str:
     """
     return get_config_parameter("url")
 
-
-#  OCTOPI REFERENCE! https://docs.octoprint.org/en/master/api/files.html
-# https://docs.octoprint.org/en/master/api/files.html#upload-file-or-create-folder
-# example script
-# https://github.com/dougbrion/OctoRest/blob/master/examples/basic/basic.py
 
 client: OctoRest | None = None
 
@@ -58,6 +61,7 @@ async def initialize_client() -> OctoRest:
         return client
 
 
+# RETRIEVING INFORMATION
 async def is_print_job_active() -> bool:
     """
     Check if a print job is currently active.
@@ -95,6 +99,67 @@ async def get_printer_info() -> dict:
     return message
 
 
+def octorest_dict_to_file_object(file_dict: dict) -> RemoteFile:
+    """
+    Convert an OctoRest dictionary to a RemoteFile object.
+
+    Args:
+        file_dict (dict): The dictionary to convert.
+
+    Returns:
+        RemoteFile: The converted RemoteFile object.
+    """
+    return RemoteFile(
+        name=file_dict.get('name'),
+        date=file_dict.get('date'),
+        display=file_dict.get('display'),
+        gcodeAnalysis=file_dict.get('gcodeAnalysis'),
+        hash=file_dict.get('hash'),
+        origin=file_dict.get('origin'),
+        path=file_dict.get('path'),
+        prints=file_dict.get('prints'),
+        refs=file_dict.get('refs'),
+        size=file_dict.get('size'),
+        statistics=file_dict.get('statistics'),
+        type=RemoteObjectTypes.FOLDER if file_dict.get('type') == 'folder' else RemoteObjectTypes.FILE,
+    )
+
+
+async def get_files_and_folders(path: str = "") -> list[RemoteFile]:
+    """
+    Get the files on the OctoPrint server.
+
+    Args:
+        path (str, optional): The path to retrieve files from. Defaults to "".
+        recursive (bool, optional): Whether to retrieve files recursively. Defaults to False.
+
+    Returns:
+        list[RemoteFile]: A list of RemoteFile objects.
+    """
+
+    global client
+    if client is None:
+        await initialize_client()
+    logger.debug("Retrieving files from OctoPrint server for path %s", path)
+    files = client.files(location=path, recursive=True)['files']   # this returns a list of dictionaries
+    # drop every progress key
+    for file in files:
+        for item in ('gcodeAnalysis', 'statistics', 'prints', 'progress'):
+            if item in file:
+                del file[item]
+
+    remote_files: list[RemoteFile] = []
+    for file in files:
+        remote_files.append(octorest_dict_to_file_object(file))
+        # if remote_files[-1].type == RemoteObjectTypes.FOLDER:
+        #     remote_files[-1].children = await get_files(remote_files[-1].path)
+        # print(remote_files[-1].name)
+        # print(remote_files[-1].type)
+        # print(file.get('children'))
+        logger.debug("Retrieved object: %s", remote_files[-1].name)
+    return remote_files
+
+
 async def pre_heat(tool_target: int = 150, bed_target: int = 45) -> None:
     """
     Preheat the 3D printer to the specified tool and bed temperatures.
@@ -123,53 +188,74 @@ async def pre_heat(tool_target: int = 150, bed_target: int = 45) -> None:
         raise RuntimeError("Cannot preheat while a print job is active.")
 
 
-async def upload_nested_dict_to_octopi(
-        gcode_dict: dict,
-        parent_folders: str = ""):
+def create_folder(folder_name, path=None, location='local'):
+    """Create a new folder on OctoPrint's file system
+    Note: Folder creation is only supported on the local file system.
     """
-    Recursively uploads gcode files to OctoPrint.
+    files = {
+        'foldername': (None, folder_name),
+    }
+    if path:
+        files['path'] = (None, path)
+
+    return client._post('/api/files/{}'.format(location), files=files)
+
+
+def upload_file(file, *, location='local', select=False, userdata=None, path=None):
+    """Upload a file to OctoPrint. Made this in order to get files to actually go into folders.
+    Args:
+        file: Path to file or tuple of (filename, file-like object)
+        location: 'local' or 'sdcard'
+        select: Whether to select file after upload
+        userdata: Optional metadata to store with file
+        path: Target folder path (must end with forward slash)
+    """
+
+    global client
+
+    with client._file_tuple(file) as file_tuple:
+        files = {
+            'file': file_tuple,
+            'select': (None, str(select).lower()),
+            'print': (None, str(print).lower())
+        }
+        if userdata:
+            files['userdata'] = (None, userdata)
+        if path:
+            if not path.endswith('/'):
+                path += '/'
+            files['path'] = (None, path)
+        return client._post('/api/files/{}'.format(location), files=files)
+
+
+async def upload_files_to_octopi(bill_of_materials: STLBoM):
+    """
+    Uploads a list of gcode files to OctoPrint under a specified project folder.
 
     Args:
-        gcode_dict (dict): A dictionary of gcode files, where the keys are the file names
-            and the values are the full file paths.
-        parent_folders (str, optional): The parent folder path. Defaults to "".
-
-    Returns:
-        bool: True if upload is successful, False otherwise.
+        bill_of_materials (STLBoM): The bill of materials containing the project name and file list.
     """
+
     logger.info("Uploading gcode files to OctoPrint.")
+    logger.debug("Bill of materials:\n%s", bill_of_materials)
     global client
     if client is None:
         await initialize_client()
 
-    for folder_name, value in gcode_dict.items():
-        folder_path_from_parent = parent_folders + folder_name
-        # create the folder
-        if parent_folders != "" and folder_name != "delete":
-            print(f'creating folder {folder_path_from_parent}')
-            response = client.new_folder(folder_path_from_parent)
+    # create the project folder
+    if bill_of_materials.project_name not in [file.name for file in await get_files_and_folders()]:
+        logger.info("Creating project folder: %s", bill_of_materials.project_name)
+        response = create_folder(bill_of_materials.project_name)
+        if not response["done"]:
+            raise RuntimeError(f"Failed to create project folder: {bill_of_materials.project_name}")
 
-        if isinstance(value, dict):
-            # create a folder
-            response = client.new_folder(folder_name)
-            print("Folder creation successful:", response)
-            await upload_nested_dict_to_octopi(
-                value, f'{parent_folders}/{folder_name}/')
-        elif isinstance(value, list):
-            for file_path in value:
-                print(f'uploading {file_path} to {folder_path_from_parent}')
-                result = client.upload(
-                    file_path,
-                    path=folder_path_from_parent,
-                    location="local")
-                if not result["done"]:
-                    raise RuntimeError(
-                        f"Failed to upload {file_path} to {folder_path_from_parent}")
-                else:
-                    logger.info("Upload successful for %s", file_path)
+    for part in bill_of_materials.parts:
+        logger.info('Uploading %s to folder %s', part.gcode_path, bill_of_materials.project_name)
+        response = upload_file(part.gcode_path, path=bill_of_materials.project_name)
+        if not response["done"]:
+            raise RuntimeError(f"Failed to upload {part.gcode_path} to {bill_of_materials.project_name}")
         else:
-            raise ValueError(
-                "Invalid gcode_dict format! \n{}".format(gcode_dict))
+            logger.info("Upload successful for %s", part.gcode_path)
 
 
 def add_set_to_continous_print(

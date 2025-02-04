@@ -6,6 +6,7 @@ import asyncio
 
 import FreeSimpleGUI as sg
 
+from auto_slicer.definitions import STLBoM
 from auto_slicer.util import get_config_parameter, set_config_parameter
 from auto_slicer.octopi_integration import pre_heat, initialize_client, is_print_job_active
 
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class BoMLineItem:
+class STLFile:
     """
     Represents a Bill of Materials (BoM) line item.
 
@@ -122,15 +123,15 @@ async def create_stl_file_selection_ui() -> str | None:
 
 
 def create_part_selection_ui(
-        parts_list: List[BoMLineItem]) -> List[BoMLineItem]:
+        parts_list: List[STLFile]) -> STLBoM:
     """
     Create a GUI to display parts with checkboxes and editable quantities, allowing selection for processing.
 
     Args:
-        parts_list (List[BoMLineItem]): A list of tuples representing parts and their quantities.
+        parts_list (List[STLFile]): A list of tuples representing parts and their quantities.
 
     Returns:
-        List[BoMLineItem]: A list of tuples representing the selected parts and their quantities.
+        STLBoM: A list of tuples representing selected parts and their quantities.
     """
     logger.debug("Parts list: %s", parts_list)
     layout = [
@@ -144,6 +145,13 @@ def create_part_selection_ui(
         ]
         for index, bom_item in enumerate(parts_list)
     ]
+
+    # get the parent folder name
+    parent_folder = os.path.basename(os.path.dirname(parts_list[0].file_path))
+
+    # create an input for the project name that defaults to the parent folder name
+    layout.append([sg.Text("Project Name:"), sg.InputText(default_text=parent_folder, key='-PROJECT_NAME-')])
+
     layout.append([sg.Button('Select All'), sg.Button('Clear All'),
                   sg.Button('CONTINUE'), sg.Button('Cancel')])
 
@@ -161,11 +169,17 @@ def create_part_selection_ui(
             for index in range(len(parts_list)):
                 window[f'CHECK_{index}'].update(value=False)
         if event == 'CONTINUE':
+            # drop all of the parts that were not selected
+            parts_list = [part_info for index, part_info in enumerate(
+                parts_list) if values[f'CHECK_{index}']]
+
             for index, part_info in enumerate(parts_list):
-                if values[f'CHECK_{index}']:
-                    part_info.quantity = int(values[f'QUANTITY_{index}'])
+                part_info.quantity = int(values[f'QUANTITY_{index}'])
             window.close()
-            return parts_list
+            return STLBoM(
+                project_name=values['-PROJECT_NAME-'],
+                parts=parts_list
+            )
 
 
 def create_slicer_config_selection_ui(config_options: List[str]) -> str:
@@ -226,51 +240,7 @@ def create_slicer_config_selection_ui(config_options: List[str]) -> str:
     return None
 
 
-def clean_file_dict(file_dict) -> dict:
-    """Recursively remove empty folders from a file dictionary."""
-
-    cleaned_dict = {}
-    for key, value in list(file_dict.items()):
-        if isinstance(value, dict):
-            cleaned_value = clean_file_dict(value)
-            if cleaned_value:
-                cleaned_dict[key] = cleaned_value
-        elif isinstance(value, list):
-            if value:
-                cleaned_dict[key] = value
-    return cleaned_dict
-
-
-def create_dict_of_files(
-        folder_path: str,
-        valid_extensions: list[str]) -> dict:
-    """
-    Get a dictionary of files in a folder with valid file extensions organized heirarchically.
-
-    Args:
-        folder_path (str): The path to the folder containing files.
-        valid_extensions (list[str]): A set of valid file extensions to screen for.
-
-    Returns:
-        dict: A dictionary of file paths, where the keys are the file names and the values are the full file paths.
-    """
-
-    root_folder = os.path.basename(folder_path)
-    files = {root_folder: []}
-    for item in os.listdir(folder_path):
-        item_path = os.path.join(folder_path, item)
-        is_file = os.path.isfile(item_path)
-        valid_type = os.path.splitext(item)[1].lower() in valid_extensions
-        if is_file and valid_type:
-            file_path = os.path.join(folder_path, item)
-            files[root_folder].append(file_path)
-
-        elif os.path.isdir(item_path):
-            files[item] = create_dict_of_files(item_path, valid_extensions)
-    return clean_file_dict(files)
-
-
-def parts_data_from_file_dict(file_dict: dict) -> List[BoMLineItem]:
+def parts_data_from_file_dict(file_dict: dict) -> List[STLFile]:
     """
     Extract parts data from a dictionary of files.
 
@@ -279,7 +249,7 @@ def parts_data_from_file_dict(file_dict: dict) -> List[BoMLineItem]:
         and the values are the full file paths.
 
     Returns:
-        List[BoMLineItem]: A list of tuples representing parts, quantities, and file paths.
+        List[STLFile]: A list of tuples representing parts, quantities, and file paths.
     """
 
     parts_data = []
@@ -291,7 +261,7 @@ def parts_data_from_file_dict(file_dict: dict) -> List[BoMLineItem]:
         elif isinstance(value, list):
             for file_path in value:
                 parts_data.append(
-                    BoMLineItem(os.path.basename(file_path), 1, file_path)
+                    STLFile(os.path.basename(file_path), 1, file_path)
                 )
         else:
             raise ValueError(

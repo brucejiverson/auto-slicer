@@ -5,7 +5,8 @@ import asyncio
 from auto_slicer import octopi_integration
 from auto_slicer import slice_stl
 from auto_slicer import ui
-from auto_slicer.definitions import BoMLineItem
+from auto_slicer.definitions import STLFile
+from auto_slicer import util
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,7 @@ async def main():
     Main function to handle the slicing and uploading of 3D model files.
     This function performs the following steps:
     1. Prompts the user to select a file or folder using a UI.
-    2. If a file is selected, creates a list with a single BoMLineItem.
+    2. If a file is selected, creates a list with a single STLFile.
     3. If a folder is selected, creates a dictionary of files with specific extensions and generates parts data.
     4. Displays the parts data to the user for potential modification.
     5. Slices each part using a brute force rotation method without support.
@@ -29,21 +30,22 @@ async def main():
     if input_path:
         if os.path.isfile(input_path):
             parts_data = [
-                BoMLineItem(
+                STLFile(
                     os.path.basename(input_path),
                     1,
                     input_path)]
-
         else:
             # Logic for processing a folder
-            file_dict = ui.create_dict_of_files(
+            file_dict = util.create_dict_of_files(
                 input_path, ['.step', '.stp', '.stl'])
             logger.debug("File dict: %s", file_dict)
             parts_data = ui.parts_data_from_file_dict(file_dict)
 
         logger.debug("Parts data: %s", parts_data)
-        mutated_parts_data = ui.create_part_selection_ui(parts_data)
-        logger.debug("Mutated parts data: %s", mutated_parts_data)
+        bill_of_materials = ui.create_part_selection_ui(parts_data)
+        logger.debug("Project name: %s", bill_of_materials.project_name)
+        logger.debug("Mutated parts data: %s", bill_of_materials.parts)
+        print(bill_of_materials)
 
         # select slicer configuration file
         slicer_config_files = [f for f in os.listdir(
@@ -70,8 +72,7 @@ async def main():
                 slicer_config_path)
 
         # Slice each part
-        outputs = []
-        for bom_item in mutated_parts_data:
+        for bom_item in bill_of_materials.parts:
             logger.info('Slicing %s.', bom_item.part_name)
             # Logic for slicing the part
             output = slice_stl.slice_stl_brute_force_rotation_no_support(
@@ -79,32 +80,8 @@ async def main():
                 slicer_config_path
             )
             bom_item.gcode_path = output
-            outputs.append(output)
 
-        logger.info("Outputs: %s", outputs)
-        # Upload each part to a cloud service
-        gcode_file_dict = ui.create_dict_of_files(input_path, ['.gcode'])
-        logger.debug("Gcode file dict: %s", gcode_file_dict)
-        # gcode_file_dict is a heirarchical dictionary of files with the values
-        # being the file paths. clean out against the outputs list
-
-        def find_keys_to_remove(d, outputs):
-            keys_to_remove = []
-            for key, value in d.items():
-                if isinstance(value, dict):
-                    keys_to_remove.extend(find_keys_to_remove(value, outputs))
-                elif value not in outputs:
-                    keys_to_remove.append(key)
-                return keys_to_remove
-
-        keys_to_remove = find_keys_to_remove(gcode_file_dict, outputs)
-        for key in keys_to_remove:
-            logger.debug(
-                "G-code file %s not found in outputs list.",
-                gcode_file_dict[key])
-            del gcode_file_dict[key]
-        logger.debug("G-code file dict after cleaning: %s", gcode_file_dict)
-        octopi_integration.upload_nested_dict_to_octopi(gcode_file_dict)
+        await octopi_integration.upload_files_to_octopi(bill_of_materials)
 
 
 def poetry_main():
