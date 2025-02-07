@@ -57,12 +57,12 @@ class RemoteObjectTypes(StrEnum):
 
 @dataclass
 class RemoteFile:
-    """A standard format to represent files or folders on a remote target. 
+    """A standard format to represent files or folders on a remote target.
 
     Nominally based on the metadata associated with Octopi files.
 
     Folder example: {'children': [], 'date': 1738558602, 'display': 'gridfinity ', 'name': 'gridfinity', 'origin': 'local', 'path': 'gridfinity', 'prints': {'failure': 0, 'success': 0}, 'refs': {'resource': 'http://octopi.local/api/files/local/gridfinity'}, 'size': 67149615, 'type': 'folder', 'typePath': ['folder']}
-    File example: 
+    File example:
 
 
     Attributes:

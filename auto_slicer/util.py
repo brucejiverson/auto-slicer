@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import json
 import shutil
 import os
@@ -5,6 +6,25 @@ import logging
 
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class STLFile:
+    """
+    Represents a Bill of Materials (BoM) line item.
+
+    Attributes:
+        part_name (str): The name of the part.
+        quantity (int): The quantity of the part.
+        file_path (str): The file path associated with the part.
+        slice_warnings (str): Any warnings generated during the slicing process.
+        gcode_path (str): The G-code file path associated with the part.
+    """
+    part_name: str
+    quantity: int
+    file_path: str
+    slice_warnings: str = None
+    gcode_path: str = None
 
 
 def get_config_parameter(parameter: str) -> str:
@@ -94,3 +114,32 @@ def create_dict_of_files(
         elif os.path.isdir(item_path):
             files[item] = create_dict_of_files(item_path, valid_extensions)
     return clean_file_dict(files)
+
+
+def parts_data_from_file_dict(file_dict: dict) -> list[STLFile]:
+    """
+    Extract parts data from a dictionary of files.
+
+    Args:
+        file_dict (dict): A dictionary of file paths, where the keys are the file names
+        and the values are the full file paths.
+
+    Returns:
+        List[STLFile]: A list of tuples representing parts, quantities, and file paths.
+    """
+
+    parts_data = []
+    # here value will either be another dict representing a subfolder or a
+    # list of file paths
+    for folder_name, value in file_dict.items():
+        if isinstance(value, dict):
+            parts_data.extend(parts_data_from_file_dict(value))
+        elif isinstance(value, list):
+            for file_path in value:
+                parts_data.append(
+                    STLFile(os.path.basename(file_path), 1, file_path)
+                )
+        else:
+            raise ValueError(
+                "Invalid file_dict format! \n{}".format(file_dict))
+    return parts_data

@@ -1,6 +1,8 @@
 import logging
+import json
 import requests
-
+import time
+from datetime import datetime
 from octorest import OctoRest
 
 from auto_slicer.definitions import STLBoM, RemoteFile, RemoteObjectTypes
@@ -141,7 +143,8 @@ async def get_files_and_folders(path: str = "") -> list[RemoteFile]:
     if client is None:
         await initialize_client()
     logger.debug("Retrieving files from OctoPrint server for path %s", path)
-    files = client.files(location=path, recursive=True)['files']   # this returns a list of dictionaries
+    files = client.files(location=path, recursive=True)[
+        'files']   # this returns a list of dictionaries
     # drop every progress key
     for file in files:
         for item in ('gcodeAnalysis', 'statistics', 'prints', 'progress'):
@@ -201,7 +204,13 @@ def create_folder(folder_name, path=None, location='local'):
     return client._post('/api/files/{}'.format(location), files=files)
 
 
-def upload_file(file, *, location='local', select=False, userdata=None, path=None):
+def upload_file(
+        file,
+        *,
+        location='local',
+        select=False,
+        userdata=None,
+        path=None):
     """Upload a file to OctoPrint. Made this in order to get files to actually go into folders.
     Args:
         file: Path to file or tuple of (filename, file-like object)
@@ -244,54 +253,30 @@ async def upload_files_to_octopi(bill_of_materials: STLBoM):
 
     # create the project folder
     if bill_of_materials.project_name not in [file.name for file in await get_files_and_folders()]:
-        logger.info("Creating project folder: %s", bill_of_materials.project_name)
+        logger.info(
+            "Creating project folder: %s",
+            bill_of_materials.project_name)
         response = create_folder(bill_of_materials.project_name)
         if not response["done"]:
-            raise RuntimeError(f"Failed to create project folder: {bill_of_materials.project_name}")
+            raise RuntimeError(
+                f"Failed to create project folder: {
+                    bill_of_materials.project_name}")
 
     for part in bill_of_materials.parts:
-        logger.info('Uploading %s to folder %s', part.gcode_path, bill_of_materials.project_name)
-        response = upload_file(part.gcode_path, path=bill_of_materials.project_name)
+        logger.info(
+            'Uploading %s to folder %s',
+            part.gcode_path,
+            bill_of_materials.project_name)
+        response = upload_file(
+            part.gcode_path,
+            path=bill_of_materials.project_name)
         if not response["done"]:
-            raise RuntimeError(f"Failed to upload {part.gcode_path} to {bill_of_materials.project_name}")
+            raise RuntimeError(
+                f"Failed to upload {
+                    part.gcode_path} to {
+                    bill_of_materials.project_name}")
         else:
             logger.info("Upload successful for %s", part.gcode_path)
-
-
-def add_set_to_continous_print(
-        path,
-        sd=False,
-        count=1,
-        jobName="Job",
-        jobDraft=True,
-        timeout=10):
-    """
-    Adds a set to the continuous print queue in OctoPrint.
-
-    Args:
-        path (str): The path to the file to be added to the print queue.
-        sd (bool, optional): Whether the file is on the SD card. Defaults to False.
-        count (int, optional): The number of times to print the file. Defaults to 1.
-        jobName (str, optional): The name of the print job. Defaults to "Job".
-        jobDraft (bool, optional): Whether the job is a draft. Defaults to True.
-        timeout (int, optional): The timeout for the request in seconds. Defaults to 10.
-
-    Returns:
-        dict: The JSON response from the OctoPrint server.
-    """
-    host_url = get_url()
-    return requests.post(
-        host_url + "/plugin/continuousprint/set/add",
-        headers={"X-Api-Key": get_api_key()},
-        data=dict(
-            path=path,
-            sd=sd,
-            count=count,
-            jobName=jobName,
-            jobDraft=jobDraft,
-        ),
-        timeout=timeout
-    ).json()
 
 
 def get_continuous_print_state(timeout=10):
@@ -308,8 +293,153 @@ def get_continuous_print_state(timeout=10):
         requests.exceptions.RequestException: If there is an issue with the network request.
     """
     host_url = get_url()
-    return requests.get(
-        host_url + "/plugin/continuousprint/state/get",
+
+    full_url = f"{host_url}/plugin/continuousprint/state/get"
+    logger.info("State check - Full URL: %s", full_url)  # Debug full URL
+
+    req = requests.get(
+        full_url,
         headers={"X-Api-Key": get_api_key()},
         timeout=timeout
     ).json()
+    logger.debug("Continuous print state: %s", req)
+    logger.info("Continuous print state: %s", req['status'])
+    """Example response:
+    {'active': False, 'profile': 'Generic', 'status': 'Inactive (click Start Managing)', 'statusType': 'NORMAL', 'queues': [{'name': 'local', 'strategy': 'IN_ORDER', 'jobs': [{'queue': 'local', 'name': 'Job 1', 'count': 1, 'draft': False, 'sets': [{'path': 'Hour clock 6 mm nozzle/hour_rotor_2h11m_0.20mm_210C_PLA_ENDER3BLTOUCH.gcode', 'count': 1, 'metadata': '{"estimatedPrintTime":9327.111602476372,"filamentLengths":[9698.619369531516]}', 'materials': [], 'profiles': [], 'id': 73, 'rank': 0.0, 'sd': False, 'remaining': 0, 'completed': 1, 'missing_file': True}, {'path': 'Hour clock 6 mm nozzle/rotor_cover_1h0m_0.20mm_210C_PLA_ENDER3BLTOUCH.gcode', 'count': 1, 'metadata':
+'{"estimatedPrintTime":4968.768529952111,"filamentLengths":[5142.755256652948]}', 'materials': [], 'profiles': [], 'id': 74, 'rank': 1.0, 'sd': False, 'remaining': 0, 'completed': 1, 'missing_file': True}, {'path': 'Hour clock 6 mm nozzle/min_rotor_1h16m_0.20mm_210C_PLA_ENDER3BLTOUCH.gcode', 'count': 1, 'metadata': '{"estimatedPrintTime":5613.150037247091,"filamentLengths":[5998.090835633688]}', 'materials': [], 'profiles': [], 'id': 75, 'rank': 2.0, 'sd': False, 'remaining': 1, 'completed': 0, 'missing_file': True}, {'path': 'Hour clock 6 mm nozzle/rear_cover_tics_49m_0.20mm_210C_PLA_ENDER3BLTOUCH.gcode', 'count': 1, 'metadata': '{"estimatedPrintTime":3899.5899984155794,"filamentLengths":[4167.450698778499]}', 'materials': [], 'profiles': [], 'id': 76, 'rank': 3.0, 'sd': False, 'remaining': 1, 'completed': 0, 'missing_file': True}], 'created': 1738518153, 'id': 30, 'remaining': 1, 'acquired': False}], 'active_set': None, 'addr': None, 'peers': [], 'rank': 0.0}]}
+    """
+    return req
+
+
+def create_job(name: str, timeout=10):
+    """Creates a new continuous print job"""
+    host_url = get_url()
+
+    req = requests.post(
+        f"{host_url}/plugin/continuousprint/job/add",
+        headers={"X-Api-Key": get_api_key()},
+        data={"json": json.dumps({"name": name})},
+        timeout=timeout
+    )
+
+    req.raise_for_status()
+    return req.json()
+
+
+def add_set_to_continous_print(
+        path: str,
+        job_name: str,  # Add job_name parameter
+        job_id: int | None = None,
+        sd=False,
+        count=1,
+        job_draft=True,
+        timeout=10):
+    """
+    Adds a set to the continuous print queue in OctoPrint.
+
+    Args:
+        path (str): The path to the file to be added to the print queue.
+        job_name (str): The name of the job to be added.
+        job_id (int | None, optional): The ID of the job, if available. Defaults to None.
+        sd (bool, optional): Whether the file is on the SD card. Defaults to False.
+        count (int, optional): The number of times to print the set. Defaults to 1.
+        job_draft (bool, optional): Whether the job is a draft. Defaults to True.
+        timeout (int, optional): The timeout for the request in seconds. Defaults to 10.
+
+    Returns:
+        dict: The JSON response from the OctoPrint API.
+
+    Raises:
+        requests.exceptions.RequestException: If the request fails.
+    """
+    host_url = get_url()
+    logger.info("Adding set to continuous print: %s", path)
+
+    req = requests.post(
+        f"{host_url}/plugin/continuousprint/set/add",
+        headers={"X-Api-Key": get_api_key()},
+        data={
+            "path": path,
+            "sd": sd,
+            "count": count,
+            "jobName": job_name,
+            "job": job_id,
+            "jobDraft": job_draft,
+        },
+        timeout=timeout
+    )
+
+    try:
+        req.raise_for_status()
+        logger.debug("Add set response: %s", req.json())
+        return req.json()
+    except requests.exceptions.RequestException as e:
+        logger.error("Failed to add set: %s", str(e))
+        logger.error(
+            "Response content: %s",
+            req.text if hasattr(
+                req,
+                'text') else 'No response text')
+        raise e
+
+
+async def create_and_configure_continuous_print_job(bill_of_materials: STLBoM):
+    """
+    Creates and configures a continuous print job in OctoPi.
+    This function first creates a print job using the provided bill of materials (BoM).
+    It then adds each part from the BoM to the created job, configuring each part as a draft if there are multiple parts.
+    Args:
+        bill_of_materials (STLBoM): An object containing the project name and a list of parts to be printed.
+                                    Each part should have a 'gcode_path' attribute.
+    Returns:
+        None
+    """
+
+    # First create the job
+    # job = create_job(bill_of_materials.project_name)
+    # job_name = job['id']  # Get the job ID from the response
+    job_name = bill_of_materials.project_name + " " + datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    job_id: int = None
+    # Then add sets to that job
+    n_parts = len(bill_of_materials.parts)
+    for part in bill_of_materials.parts:
+        time.sleep(0.5)
+        octopi_path = f'{bill_of_materials.project_name}/{part.part_name}.gcode'
+        draft = True if n_parts > 1 else False
+        print(part)
+        response = add_set_to_continous_print(
+            octopi_path, job_name, job_id=job_id, job_draft=draft)
+        job_id = response['job_id']  # Get the job ID from the response
+
+    logger.info("Continuous print job created and configured.")
+
+
+def set_active(active: bool = True, timeout: int = 10) -> dict:
+    """
+    Set the active state of the continuous print plugin.
+
+    Args:
+        active (bool, optional): Whether to activate or deactivate the plugin. Defaults to True.
+        timeout (int, optional): The maximum time to wait for a response from the server. Defaults to 10 seconds.
+
+    Returns:
+        dict: The JSON response from the server.
+
+    Raises:
+        requests.exceptions.RequestException: If there is an issue with the network request.
+    """
+    state = get_continuous_print_state()
+    if state['active'] == active:
+        logger.info("Continuous print active state already set to: %s", active)
+        return state
+
+    host_url = get_url()
+    logger.info("Setting continuous print active state to: %s", active)
+    req = requests.post(
+        f"{host_url}/plugin/continuousprint/set_active",
+        headers={"X-Api-Key": get_api_key()},
+        data={"active": active},
+        timeout=timeout
+    ).json()
+    logger.debug("Set active response: %s", req)
+    return req

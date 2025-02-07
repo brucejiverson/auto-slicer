@@ -1,12 +1,11 @@
 import os
 from typing import List
-from dataclasses import dataclass
 import logging
 import asyncio
 
 import FreeSimpleGUI as sg
 
-from auto_slicer.definitions import STLBoM
+from auto_slicer.definitions import STLBoM, STLFile
 from auto_slicer.util import get_config_parameter, set_config_parameter
 from auto_slicer.octopi_integration import pre_heat, initialize_client, is_print_job_active
 
@@ -14,28 +13,16 @@ from auto_slicer.octopi_integration import pre_heat, initialize_client, is_print
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class STLFile:
-    """
-    Represents a Bill of Materials (BoM) line item.
-
-    Attributes:
-        part_name (str): The name of the part.
-        quantity (int): The quantity of the part.
-        file_path (str): The file path associated with the part.
-        slice_warnings (str): Any warnings generated during the slicing process.
-        gcode_path (str): The G-code file path associated with the part.
-    """
-    part_name: str
-    quantity: int
-    file_path: str
-    slice_warnings: str = None
-    gcode_path: str = None
-
-
 DEFAULT_TEXT_SETTINGS = {
     'font': ('Helvetica', 16),
 }
+
+
+pages_names = (
+    "Select a file or folder",
+    "Select parts for processing",
+    "Select a slicer configuration"
+)
 
 
 async def create_stl_file_selection_ui() -> str | None:
@@ -149,8 +136,10 @@ def create_part_selection_ui(
     # get the parent folder name
     parent_folder = os.path.basename(os.path.dirname(parts_list[0].file_path))
 
-    # create an input for the project name that defaults to the parent folder name
-    layout.append([sg.Text("Project Name:"), sg.InputText(default_text=parent_folder, key='-PROJECT_NAME-')])
+    # create an input for the project name that defaults to the parent folder
+    # name
+    layout.append([sg.Text("Project Name:"), sg.InputText(
+        default_text=parent_folder, key='-PROJECT_NAME-')])
 
     layout.append([sg.Button('Select All'), sg.Button('Clear All'),
                   sg.Button('CONTINUE'), sg.Button('Cancel')])
@@ -202,7 +191,9 @@ def create_slicer_config_selection_ui(config_options: List[str]) -> str:
             sg.Input(key='-NEW_CONFIG-', enable_events=True),
             sg.FileBrowse("Browse Files", file_types=(("Config Files", "*.ini"), ("All Files", "*.*"))),
         ],
-        [sg.Button('Add Config')]
+        [sg.Button('Add Config')],
+        [sg.Checkbox('Use Continuous Print', key='-CONTINUOUS_PRINT-')],
+        [sg.Checkbox('Start Print After Slicing', key='-START_AFTER-')],
     ]
 
     window = sg.Window('Slicer Configuration Selection', layout)
@@ -238,32 +229,3 @@ def create_slicer_config_selection_ui(config_options: List[str]) -> str:
 
     window.close()
     return None
-
-
-def parts_data_from_file_dict(file_dict: dict) -> List[STLFile]:
-    """
-    Extract parts data from a dictionary of files.
-
-    Args:
-        file_dict (dict): A dictionary of file paths, where the keys are the file names
-        and the values are the full file paths.
-
-    Returns:
-        List[STLFile]: A list of tuples representing parts, quantities, and file paths.
-    """
-
-    parts_data = []
-    # here value will either be another dict representing a subfolder or a
-    # list of file paths
-    for folder_name, value in file_dict.items():
-        if isinstance(value, dict):
-            parts_data.extend(parts_data_from_file_dict(value))
-        elif isinstance(value, list):
-            for file_path in value:
-                parts_data.append(
-                    STLFile(os.path.basename(file_path), 1, file_path)
-                )
-        else:
-            raise ValueError(
-                "Invalid file_dict format! \n{}".format(file_dict))
-    return parts_data

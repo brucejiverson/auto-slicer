@@ -2,7 +2,7 @@ import os
 import logging
 import asyncio
 
-from auto_slicer import octopi_integration
+from auto_slicer import octopi_integration as op
 from auto_slicer import slice_stl
 from auto_slicer import ui
 from auto_slicer.definitions import STLFile
@@ -35,11 +35,10 @@ async def main():
                     1,
                     input_path)]
         else:
-            # Logic for processing a folder
             file_dict = util.create_dict_of_files(
                 input_path, ['.step', '.stp', '.stl'])
             logger.debug("File dict: %s", file_dict)
-            parts_data = ui.parts_data_from_file_dict(file_dict)
+            parts_data = util.parts_data_from_file_dict(file_dict)
 
         logger.debug("Parts data: %s", parts_data)
         bill_of_materials = ui.create_part_selection_ui(parts_data)
@@ -81,7 +80,8 @@ async def main():
             )
             bom_item.gcode_path = output
 
-        await octopi_integration.upload_files_to_octopi(bill_of_materials)
+        await op.upload_files_to_octopi(bill_of_materials)
+        await op.create_and_configure_continuous_print_job(bill_of_materials)
 
 
 def poetry_main():
